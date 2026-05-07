@@ -1,4 +1,4 @@
-import {getEnv} from '@/utility/get-env';
+import {getEnv} from '@/common/get-env';
 import {Global, Module} from '@nestjs/common';
 import {Db, MongoClient} from 'mongodb';
 

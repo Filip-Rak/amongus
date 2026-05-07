@@ -1,0 +1,75 @@
+@baseUrl = http://localhost:3001
+@json = Content-Type: application/json
+@auth = Authorization: Bearer {{login.response.body.$.access_token}}
+
+###
+# =========================
+# HEALTH
+# =========================
+
+###
+# Health
+GET {{baseUrl}}/health
+
+###
+# Database Health
+GET {{baseUrl}}/health/db
+
+###
+# =========================
+# AUTH
+# =========================
+
+###
+# @name login
+POST {{baseUrl}}/auth/login
+{{json}}
+
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+
+###
+# =========================
+# USERS
+# Admin only
+# =========================
+
+###
+# Get all users
+GET {{baseUrl}}/users
+{{auth}}
+
+###
+# Get one user
+GET {{baseUrl}}/users/69fc4f0c854dbf2bdd3f9295
+{{auth}}
+
+###
+# Create user
+POST {{baseUrl}}/users
+{{auth}}
+{{json}}
+
+{
+  "email": "admin@example.com",
+  "password": "password123",
+  "role": "admin"
+}
+
+###
+# Update user
+PATCH {{baseUrl}}/users/69fc4f0c854dbf2bdd3f9295
+{{auth}}
+{{json}}
+
+{
+  "email": "admin@example.com",
+  "role": "admin"
+}
+
+###
+# Delete user
+DELETE {{baseUrl}}/users/1
+{{auth}}

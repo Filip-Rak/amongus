@@ -23,7 +23,6 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 	async ping(): Promise< boolean >
 	{
 		const result = await this.db.command( { ping : 1 } );
-
 		return result.ok === 1;
 	}
 

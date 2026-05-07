@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import {getEnv} from '@/utility/get-env';
+import {getEnv} from '@/common/get-env';
 import {ValidationPipe} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 
