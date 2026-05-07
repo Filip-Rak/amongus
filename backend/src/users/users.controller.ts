@@ -1,3 +1,4 @@
+import {Roles} from '@/auth/decorators/roles.decorator';
 import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
 
@@ -7,12 +8,10 @@ import {CreateUserDto} from './dto/create-user.dto';
 import {ListUsersQueryDto} from './dto/list-users-query.dto';
 import {UpdateUserDto} from './dto/update-user.dto';
 import {UserResponseDto} from './dto/user-response.dto';
-import {
-	PaginatedUsersResponseDto,
-	UsersService,
-} from './users.service';
+import {UserRole} from './types/user-role.enum';
+import {PaginatedUsersResponseDto, UsersService} from './users.service';
 
-@Controller( 'users' ) export class UsersController
+@Roles( UserRole.Admin ) @Controller( 'users' ) export class UsersController
 {
 	constructor( private readonly usersService: UsersService ) {}
 

@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:3001
 @json = Content-Type: application/json
-@auth = Authorization: Bearer {{login.response.body.$.access_token}}
+@auth = Authorization: Bearer {{login.response.body.$.accessToken}}
 
 ###
 # =========================
