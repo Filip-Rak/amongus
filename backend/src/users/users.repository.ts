@@ -5,6 +5,7 @@ import {DatabaseService} from '../database/database.service';
 
 import {UserDocument, UserRecord} from './types/user-document.type';
 import {UserRole} from './types/user-role.enum';
+import {UserStatus} from './types/user-status.enum';
 
 export interface CreateUserInput {
 	email: string;
@@ -60,6 +61,13 @@ export interface FindUsersResult {
 			    name : 'ix_users_role',
 		    },
 		);
+
+		await this.users.createIndex(
+		    { status : 1 },
+		    {
+			    name : 'ix_users_status',
+		    },
+		);
 	}
 
 	async create( input: CreateUserInput ): Promise< UserRecord >
@@ -70,6 +78,7 @@ export interface FindUsersResult {
 			email : input.email,
 			passwordHash : input.passwordHash,
 			role : input.role,
+			status : UserStatus.Active,
 			createdAt : now,
 			updatedAt : now,
 		};
@@ -130,11 +139,23 @@ export interface FindUsersResult {
 		);
 	}
 
-	async deleteById( id: ObjectId ): Promise< boolean >
+	async softDeleteById( id: ObjectId ): Promise< boolean >
 	{
-		const result = await this.users.deleteOne( { _id : id } );
+		const result = await this.users.updateOne(
+		    {
+			    _id : id,
+			    status : UserStatus.Active,
+		    },
+		    {
+			    $set : {
+				    status : UserStatus.Deleted,
+				    deletedAt : new Date(),
+				    updatedAt : new Date(),
+			    },
+		    },
+		);
 
-		return result.deletedCount === 1;
+		return result.modifiedCount === 1;
 	}
 
 	private buildFilter( input: FindUsersInput ): Filter< UserDocument >

@@ -18,7 +18,18 @@ GET {{baseUrl}}/health/db
 ###
 # =========================
 # AUTH
+# Public
 # =========================
+
+###
+# Register
+POST {{baseUrl}}/auth/register
+{{json}}
+
+{
+  "email": "user2@example.com",
+  "password": "password123"
+}
 
 ###
 # @name login
@@ -33,43 +44,73 @@ POST {{baseUrl}}/auth/login
 ###
 # =========================
 # USERS
-# Admin only
+# User, Admin
 # =========================
 
 ###
 # Get all users
+# Admin
 GET {{baseUrl}}/users
 {{auth}}
 
 ###
 # Get one user
+# Admin
 GET {{baseUrl}}/users/69fc4f0c854dbf2bdd3f9295
 {{auth}}
 
 ###
+# Find me
+# User, Admin
+GET {{baseUrl}}/users/me
+{{auth}}
+
+###
 # Create user
+# Admin
 POST {{baseUrl}}/users
 {{auth}}
 {{json}}
 
 {
-  "email": "admin@example.com",
+  "email": "admin2@example.com",
   "password": "password123",
   "role": "admin"
 }
 
 ###
+# Update me
+# User, Admin
+PATCH {{baseUrl}}/users/me
+{{auth}}
+{{json}}
+
+{
+  "email": "editedSelf2@example.com",
+  "currentPassword": "password123"
+}
+
+
+###
 # Update user
+# Admin
 PATCH {{baseUrl}}/users/69fc4f0c854dbf2bdd3f9295
 {{auth}}
 {{json}}
 
 {
-  "email": "admin@example.com",
-  "role": "admin"
+  "role": "admin",
+  "status": "active"
 }
 
 ###
 # Delete user
+# Admin
 DELETE {{baseUrl}}/users/1
+{{auth}}
+
+###
+# Remove self.
+# User
+DELETE {{baseUrl}}/users/me
 {{auth}}

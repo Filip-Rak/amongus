@@ -1,9 +1,13 @@
-import {UserRole} from '@/users/types/user-role.enum';
-import {UserStatus} from '@/users/types/user-status.enum';
 import {Transform} from 'class-transformer';
-import {IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength} from 'class-validator';
+import {
+	IsEmail,
+	IsOptional,
+	IsString,
+	MaxLength,
+	MinLength,
+} from 'class-validator';
 
-export class UpdateUserDto
+export class UpdateMeDto
 {
 	@IsOptional()
 	@Transform(
@@ -16,6 +20,5 @@ export class UpdateUserDto
 
 	@IsOptional() @IsString() @MinLength( 6 ) @MaxLength( 128 ) password?: string;
 
-	@IsOptional() @IsEnum( UserRole ) role?: UserRole;
-	@IsOptional() @IsEnum( UserStatus ) status?: UserStatus;
+	@IsOptional() @IsString() @MinLength( 6 ) @MaxLength( 128 ) currentPassword?: string;
 }
