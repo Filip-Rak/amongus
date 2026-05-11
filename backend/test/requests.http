@@ -235,3 +235,9 @@ PATCH {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
 # User, Admin
 DELETE {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
 {{auth}}
+
+# POST /orders/checkout
+# GET  /orders/my
+# GET  /orders/:id
+# POST /payments/:id/mock-success
+# POST /payments/:id/mock-failure

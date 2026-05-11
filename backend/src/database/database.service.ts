@@ -1,5 +1,5 @@
 import {Inject, Injectable, Logger, OnApplicationShutdown} from '@nestjs/common';
-import {Collection, Db, Document, MongoClient} from 'mongodb';
+import {ClientSession, Collection, Db, Document, MongoClient, TransactionOptions} from 'mongodb';
 
 import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 
@@ -20,16 +20,45 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 		return this.db.collection< TSchema >( name );
 	}
 
+	async onApplicationShutdown(): Promise< void >
+	{
+		this.logger.log( 'Closing MongoDB connection...' );
+		await this.client.close();
+	}
+
 	async ping(): Promise< boolean >
 	{
 		const result = await this.db.command( { ping : 1 } );
 		return result.ok === 1;
 	}
 
-	async onApplicationShutdown(): Promise< void >
+	async withTransaction< T >(
+	    callback: ( session: ClientSession ) => Promise< T >,
+	    ): Promise< T >
 	{
-		this.logger.log( 'Closing MongoDB connection...' );
-		await this.client.close();
+		const session = this.client.startSession();
+
+		const transactionOptions: TransactionOptions = {
+			readConcern : {
+				level : 'snapshot',
+			},
+			writeConcern : {
+				w : 'majority',
+			},
+		};
+
+		try
+		{
+			let result!: T;
+
+			await session.withTransaction( async () => { result = await callback( session ); }, transactionOptions );
+
+			return result;
+		}
+		finally
+		{
+			await session.endSession();
+		}
 	}
 
 	getDb(): Db

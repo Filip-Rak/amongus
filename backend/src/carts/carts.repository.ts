@@ -1,3 +1,4 @@
+import {RepositoryOptions} from '@/common/types/repository-options.type';
 import {DatabaseService} from '@/database/database.service';
 import {Injectable, OnModuleInit} from '@nestjs/common';
 import {Collection, ObjectId} from 'mongodb';
@@ -18,27 +19,17 @@ import {CartDocument, CartRecord} from './types/cart-document.type';
 		await this.ensureIndexes();
 	}
 
-	private async ensureIndexes(): Promise< void >
+	async findByUserId(
+	    userId: ObjectId,
+	    options?: RepositoryOptions,
+	    ): Promise< CartRecord|null >
 	{
-		await this.carts.createIndex(
-		    { userId : 1 },
+		return this.carts.findOne(
+		    { userId },
 		    {
-			    unique : true,
-			    name : 'uq_carts_user_id',
+			    session : options?.session,
 		    },
 		);
-
-		await this.carts.createIndex(
-		    { 'items.productId' : 1 },
-		    {
-			    name : 'ix_carts_items_product_id',
-		    },
-		);
-	}
-
-	async findByUserId( userId: ObjectId ): Promise< CartRecord|null >
-	{
-		return this.carts.findOne( { userId } );
 	}
 
 	async addItem(
@@ -258,7 +249,10 @@ import {CartDocument, CartRecord} from './types/cart-document.type';
 		);
 	}
 
-	async clear( userId: ObjectId ): Promise< void >
+	async clear(
+	    userId: ObjectId,
+	    options?: RepositoryOptions,
+	    ): Promise< void >
 	{
 		await this.carts.updateOne(
 		    { userId },
@@ -267,6 +261,27 @@ import {CartDocument, CartRecord} from './types/cart-document.type';
 				    items : [],
 				    updatedAt : new Date(),
 			    },
+		    },
+		    {
+			    session : options?.session,
+		    },
+		);
+	}
+
+	private async ensureIndexes(): Promise< void >
+	{
+		await this.carts.createIndex(
+		    { userId : 1 },
+		    {
+			    unique : true,
+			    name : 'uq_carts_user_id',
+		    },
+		);
+
+		await this.carts.createIndex(
+		    { 'items.productId' : 1 },
+		    {
+			    name : 'ix_carts_items_product_id',
 		    },
 		);
 	}

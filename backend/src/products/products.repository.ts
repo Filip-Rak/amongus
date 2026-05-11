@@ -1,3 +1,4 @@
+import {RepositoryOptions} from '@/common/types/repository-options.type';
 import {DatabaseService} from '@/database/database.service';
 import {Injectable, OnModuleInit} from '@nestjs/common';
 import {Collection, Filter, ObjectId, Sort, UpdateFilter} from 'mongodb';
@@ -243,14 +244,26 @@ type ProductFindFilter = Filter< ProductDocument >&
 		return result.modifiedCount === 1;
 	}
 
-	async findActiveById( id: ObjectId ): Promise< ProductRecord|null >
+	async findActiveById(
+	    id: ObjectId,
+	    options?: RepositoryOptions,
+	    ): Promise< ProductRecord|null >
 	{
-		return this.findById( id, {
-			includeInactive : false,  // TODO: Verify.
-		} );
+		return this.products.findOne(
+		    {
+			    _id : id,
+			    status : ProductStatus.Active,
+		    },
+		    {
+			    session : options?.session,
+		    },
+		);
 	}
 
-	async findActiveByIds( ids: ObjectId[] ): Promise< ProductRecord[] >
+	async findActiveByIds(
+	    ids: ObjectId[],
+	    options?: RepositoryOptions,
+	    ): Promise< ProductRecord[] >
 	{
 		if ( ids.length === 0 )
 		{
@@ -258,15 +271,49 @@ type ProductFindFilter = Filter< ProductDocument >&
 		}
 
 		return this.products
-		    .find( {
-			    _id : {
-				    $in : ids,
-			    },
-			    status : ProductStatus.Active,
-		    } )
+		    .find(
+		        {
+			        _id : {
+				        $in : ids,
+			        },
+			        status : ProductStatus.Active,
+		        },
+		        {
+			        session : options?.session,
+		        },
+		        )
 		    .toArray();
 	}
 
+	async decreaseStockIfAvailable(
+	    id: ObjectId,
+	    quantity: number,
+	    options?: RepositoryOptions,
+	    ): Promise< boolean >
+	{
+		const result = await this.products.updateOne(
+		    {
+			    _id : id,
+			    status : ProductStatus.Active,
+			    stock : {
+				    $gte : quantity,
+			    },
+		    },
+		    {
+			    $inc : {
+				    stock : -quantity,
+			    },
+			    $set : {
+				    updatedAt : new Date(),
+			    },
+		    },
+		    {
+			    session : options?.session,
+		    },
+		);
+
+		return result.modifiedCount === 1;
+	}
 	private buildFindManyFilter( input: FindProductsInput ): ProductFindFilter
 	{
 		const filter: ProductFindFilter = {};
