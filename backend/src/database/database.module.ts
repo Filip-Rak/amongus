@@ -2,6 +2,7 @@ import {getEnv} from '@/common/get-env';
 import {Global, Module} from '@nestjs/common';
 import {Db, MongoClient} from 'mongodb';
 
+import {DatabaseValidationService} from './database-validation.service';
 import {DatabaseService} from './database.service';
 import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 
@@ -31,7 +32,7 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 	            return client.db( dbName );
 			},
 		},
-		DatabaseService,
+		DatabaseService, DatabaseValidationService
 	],
 	exports : [ MONGO_CLIENT, MONGO_DB, DatabaseService ],
 } )

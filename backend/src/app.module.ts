@@ -1,6 +1,7 @@
 import {Module} from '@nestjs/common';
 
 import {AuthModule} from './auth/auth.module';
+import {CartsModule} from './carts/carts.module';
 import {DatabaseModule} from './database/database.module';
 import {DatabaseService} from './database/database.service';
 import {HealthModule} from './health/health.module';
@@ -17,6 +18,7 @@ import {UsersModule} from './users/users.module';
 		UsersModule,
 		AuthModule,
 		ProductsModule,
+		CartsModule,
 	],
 	controllers : [
 		UsersController,

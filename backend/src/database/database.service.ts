@@ -31,4 +31,9 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 		this.logger.log( 'Closing MongoDB connection...' );
 		await this.client.close();
 	}
+
+	getDb(): Db
+	{
+		return this.db;
+	}
 }

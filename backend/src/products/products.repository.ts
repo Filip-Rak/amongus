@@ -243,6 +243,30 @@ type ProductFindFilter = Filter< ProductDocument >&
 		return result.modifiedCount === 1;
 	}
 
+	async findActiveById( id: ObjectId ): Promise< ProductRecord|null >
+	{
+		return this.findById( id, {
+			includeInactive : false,  // TODO: Verify.
+		} );
+	}
+
+	async findActiveByIds( ids: ObjectId[] ): Promise< ProductRecord[] >
+	{
+		if ( ids.length === 0 )
+		{
+			return [];
+		}
+
+		return this.products
+		    .find( {
+			    _id : {
+				    $in : ids,
+			    },
+			    status : ProductStatus.Active,
+		    } )
+		    .toArray();
+	}
+
 	private buildFindManyFilter( input: FindProductsInput ): ProductFindFilter
 	{
 		const filter: ProductFindFilter = {};
