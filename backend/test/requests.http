@@ -9,16 +9,17 @@
 
 ###
 # Health
+# Public
 GET {{baseUrl}}/health
 
 ###
 # Database Health
+# Public
 GET {{baseUrl}}/health/db
 
 ###
 # =========================
 # AUTH
-# Public
 # =========================
 
 ###
@@ -52,7 +53,6 @@ GET {{baseUrl}}/auth/me
 ###
 # =========================
 # USERS
-# User, Admin
 # =========================
 
 ###
@@ -112,7 +112,7 @@ PATCH {{baseUrl}}/users/6a00c5798a197fe534142f20
 }
 
 ###
-# Delete user
+# Soft delete user
 # Admin
 DELETE {{baseUrl}}/users/1
 {{auth}}
@@ -122,3 +122,80 @@ DELETE {{baseUrl}}/users/1
 # User
 DELETE {{baseUrl}}/users/me
 {{auth}}
+
+###
+# =========================
+# Products
+# =========================
+
+###
+# Get public products
+# Public
+GET {{baseUrl}}/products
+
+###
+# Get all products
+# Admin
+GET {{baseUrl}}/products/admin
+{{auth}}
+
+###
+# Get specific product
+# Admin
+GET {{baseUrl}}/products/admin/6a01a26067dc2520bb700e7a
+{{auth}}
+
+###
+# Get specific public product by slug
+# Public
+GET {{baseUrl}}/products/slug/:slug
+
+###
+# Get specific public product by id
+# Public
+GET {{baseUrl}}/products/6a01a26067dc2520bb700e7a
+
+###
+# Create product
+# Admin
+POST {{baseUrl}}/products
+{{auth}}
+{{json}}
+
+{
+	"name": "Mechanical Keyboard K87",
+	"description": "Compact hot-swappable mechanical keyboard.",
+	"price": {
+		"amount": 29999,
+		"currency": "PLN"
+	},
+	"stock": 15,
+	"images": [
+		{
+			"url": "https://i.ytimg.com/vi/ztyjepxO7mM/hqdefault.jpg",
+			"alt": "Keyboard front view",
+			"isPrimary": true
+		}
+	],
+	"attributes": {
+		"layout": "TKL",
+		"switchType": "brown",
+		"wireless": false,
+		"color": "black"
+	},
+	"status": "active"
+}
+
+###
+# Update product
+# Admin
+PATCH {{baseUrl}}/products/6a01a26067dc2520bb700e7a
+{{auth}}
+{{json}}
+
+{
+	"status": "archived"
+}
+
+
+# TODO: Mongo validation.
