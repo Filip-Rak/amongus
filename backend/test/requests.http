@@ -29,7 +29,7 @@ POST {{baseUrl}}/auth/register
 {{json}}
 
 {
-  "email": "user2@example.com",
+  "email": "anthony@example.com",
   "password": "password123"
 }
 
@@ -40,7 +40,7 @@ POST {{baseUrl}}/auth/login
 {{json}}
 
 {
-  "email": "admin1@example.com",
+  "email": "anthony@example.com",
   "password": "password123"
 }
 
@@ -203,13 +203,13 @@ PATCH {{baseUrl}}/products/6a01a26067dc2520bb700e7a
 
 ###
 # Get cart
-# User, Admin
+# User
 GET {{baseUrl}}/cart
 {{auth}}
 
 ###
 # Add to cart
-# User, Admin
+# User
 POST {{baseUrl}}/cart/items
 {{auth}}
 {{json}}
@@ -221,7 +221,7 @@ POST {{baseUrl}}/cart/items
 
 ###
 # Update cart item quantity
-# User, Admin
+# User
 PATCH {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
 {{auth}}
 {{json}}
@@ -232,9 +232,32 @@ PATCH {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
 
 ###
 # Remove item from cart
-# User, Admin
+# User
 DELETE {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
 {{auth}}
+
+# =========================
+# Orders
+# =========================
+
+###
+# Checkout
+# User
+POST {{baseUrl}}/orders/checkout
+{{auth}}
+{{json}}
+
+{
+	"shippingAddress": 
+	{
+		"fullName": "Jan Kowalski",
+		"line1": "Testowa 12",
+		"city": "Warsaw",
+		"postalCode": "00-001",
+		"country": "Poland",
+		"phone": "+48123123123"
+	}
+}
 
 # POST /orders/checkout
 # GET  /orders/my

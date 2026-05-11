@@ -1,6 +1,8 @@
 import type {JwtUser} from '@/auth/auth.types';
 import {CurrentUser} from '@/auth/decorators/current-user.decorator';
+import {Roles} from '@/auth/decorators/roles.decorator';
 import {ParseObjectIdPipe} from '@/common/pipes/parse-object-id.pipe';
+import {UserRole} from '@/users/types/user-role.enum';
 import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
 
@@ -9,7 +11,7 @@ import {AddCartItemDto} from './dto/add-cart-item.dto';
 import {CartResponseDto} from './dto/cart-response.dto';
 import {UpdateCartItemDto} from './dto/update-cart-item.dto';
 
-@Controller( 'cart' ) export class CartsController
+@Controller( 'cart' ) @Roles( UserRole.User ) export class CartsController
 {
 	constructor( private readonly cartsService: CartsService ) {}
 
