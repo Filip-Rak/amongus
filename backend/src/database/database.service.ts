@@ -1,5 +1,5 @@
 import {Inject, Injectable, Logger, OnApplicationShutdown} from '@nestjs/common';
-import {ClientSession, Collection, Db, Document, MongoClient, TransactionOptions} from 'mongodb';
+import {ClientSession, Collection, Db, Document, MongoClient, MongoServerError, TransactionOptions} from 'mongodb';
 
 import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 
@@ -54,6 +54,23 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 			await session.withTransaction( async () => { result = await callback( session ); }, transactionOptions );
 
 			return result;
+		}
+		catch ( error )
+		{
+			this.logger.error(
+			    'MongoDB transaction failed',
+			    error instanceof Error ? error.stack : String( error ),
+			);
+
+			if ( error instanceof MongoServerError && error.code === 121 )
+			{
+				this.logger.error(
+				    'MongoDB validation details',
+				    JSON.stringify( error.errInfo, null, 2 ),
+				);
+			}
+
+			throw error;
 		}
 		finally
 		{

@@ -14,6 +14,8 @@ import {DatabaseService} from './database.service';
 		await this.applyUsersValidation();
 		await this.applyProductsValidation();
 		await this.applyCartsValidation();
+		await this.applyOrdersValidation();
+		await this.applyPaymentsValidation();
 	}
 
 	private async applyUsersValidation(): Promise< void >
@@ -105,7 +107,7 @@ import {DatabaseService} from './database.service';
 						required : [ 'amount', 'currency' ],
 						properties : {
 							amount : {
-								bsonType : [ 'int', 'long' ],
+								bsonType : 'number',
 								minimum : 0,
 								description : 'price.amount must be a non-negative integer',
 							},
@@ -116,7 +118,7 @@ import {DatabaseService} from './database.service';
 						},
 					},
 					stock : {
-						bsonType : [ 'int', 'long' ],
+						bsonType : 'number',
 						minimum : 0,
 						description : 'stock must be a non-negative integer',
 					},
@@ -201,7 +203,7 @@ import {DatabaseService} from './database.service';
 									description : 'productId must be an ObjectId and is required',
 								},
 								quantity : {
-									bsonType : [ 'int', 'long' ],
+									bsonType : 'number',
 									minimum : 1,
 									description : 'quantity must be a positive integer',
 								},
@@ -223,6 +225,211 @@ import {DatabaseService} from './database.service';
 					updatedAt : {
 						bsonType : 'date',
 						description : 'updatedAt must be a date and is required',
+					},
+				},
+			},
+		} );
+	}
+
+	private async applyOrdersValidation(): Promise< void >
+	{
+		await this.applyCollectionValidator( 'orders', {
+			$jsonSchema : {
+				bsonType : 'object',
+				required : [
+					'userId',
+					'status',
+					'items',
+					'shippingAddress',
+					'totals',
+					'createdAt',
+					'updatedAt',
+				],
+				properties : {
+					userId : {
+						bsonType : 'objectId',
+					},
+					status : {
+						enum : [
+							'pending_payment',
+							'paid',
+							'payment_failed',
+							'cancelled',
+							'shipped',
+							'completed',
+						],
+					},
+					items : {
+						bsonType : 'array',
+						minItems : 1,
+						items : {
+							bsonType : 'object',
+							required : [
+								'productId',
+								'productName',
+								'productSlug',
+								'unitPriceAmount',
+								'currency',
+								'quantity',
+							],
+							properties : {
+								productId : {
+									bsonType : 'objectId',
+								},
+								productName : {
+									bsonType : 'string',
+								},
+								productSlug : {
+									bsonType : 'string',
+								},
+								unitPriceAmount : {
+									bsonType : 'number',
+									minimum : 0,
+								},
+								currency : {
+									enum : [ 'PLN', 'EUR', 'USD' ],
+								},
+								quantity : {
+									bsonType : 'number',
+									minimum : 1,
+								},
+								imageUrl : {
+									bsonType : 'string',
+								},
+							},
+						},
+					},
+					shippingAddress : {
+						bsonType : 'object',
+						required : [
+							'fullName',
+							'line1',
+							'city',
+							'postalCode',
+							'country',
+						],
+						properties : {
+							fullName : {
+								bsonType : 'string',
+							},
+							line1 : {
+								bsonType : 'string',
+							},
+							line2 : {
+								bsonType : 'string',
+							},
+							city : {
+								bsonType : 'string',
+							},
+							postalCode : {
+								bsonType : 'string',
+							},
+							country : {
+								bsonType : 'string',
+							},
+							phone : {
+								bsonType : 'string',
+							},
+						},
+					},
+					totals : {
+						bsonType : 'object',
+						required : [
+							'subtotalAmount',
+							'shippingAmount',
+							'totalAmount',
+							'currency',
+						],
+						properties : {
+							subtotalAmount : {
+								bsonType : 'number',
+								minimum : 0,
+							},
+							shippingAmount : {
+								bsonType : 'number',
+								minimum : 0,
+							},
+							totalAmount : {
+								bsonType : 'number',
+								minimum : 0,
+							},
+							currency : {
+								enum : [ 'PLN', 'EUR', 'USD' ],
+							},
+						},
+					},
+					paymentId : {
+						bsonType : 'objectId',
+					},
+					createdAt : {
+						bsonType : 'date',
+					},
+					updatedAt : {
+						bsonType : 'date',
+					},
+					paidAt : {
+						bsonType : 'date',
+					},
+					cancelledAt : {
+						bsonType : 'date',
+					},
+				},
+			},
+		} );
+	}
+
+	private async applyPaymentsValidation(): Promise< void >
+	{
+		await this.applyCollectionValidator( 'payments', {
+			$jsonSchema : {
+				bsonType : 'object',
+				required : [
+					'orderId',
+					'userId',
+					'provider',
+					'status',
+					'amount',
+					'currency',
+					'createdAt',
+					'updatedAt',
+				],
+				properties : {
+					orderId : {
+						bsonType : 'objectId',
+					},
+					userId : {
+						bsonType : 'objectId',
+					},
+					provider : {
+						enum : [ 'mock' ],
+					},
+					status : {
+						enum : [ 'pending', 'paid', 'failed' ],
+					},
+					amount : {
+						bsonType : 'number',
+						minimum : 0,
+					},
+					currency : {
+						enum : [ 'PLN', 'EUR', 'USD' ],
+					},
+					mockTransactionId : {
+						bsonType : 'string',
+					},
+					failureReason : {
+						bsonType : 'string',
+					},
+					createdAt : {
+						bsonType : 'date',
+					},
+					updatedAt : {
+						bsonType : 'date',
+					},
+					paidAt : {
+						bsonType : 'date',
+					},
+					failedAt : {
+						bsonType : 'date',
 					},
 				},
 			},
