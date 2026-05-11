@@ -1,0 +1,237 @@
+@baseUrl = http://localhost:3001
+@json = Content-Type: application/json
+@auth = Authorization: Bearer {{login.response.body.$.accessToken}}
+
+###
+# =========================
+# HEALTH
+# =========================
+
+###
+# Health
+# Public
+GET {{baseUrl}}/health
+
+###
+# Database Health
+# Public
+GET {{baseUrl}}/health/db
+
+###
+# =========================
+# AUTH
+# =========================
+
+###
+# Register
+# Public
+POST {{baseUrl}}/auth/register
+{{json}}
+
+{
+  "email": "user2@example.com",
+  "password": "password123"
+}
+
+###
+# @name login
+# Public
+POST {{baseUrl}}/auth/login
+{{json}}
+
+{
+  "email": "admin1@example.com",
+  "password": "password123"
+}
+
+###
+# Me
+# User, Admin
+GET {{baseUrl}}/auth/me
+{{auth}}
+
+###
+# =========================
+# USERS
+# =========================
+
+###
+# Get all users
+# Admin
+GET {{baseUrl}}/users
+{{auth}}
+
+###
+# Get one user
+# Admin
+GET {{baseUrl}}/users/69fc4f0c854dbf2bdd3f9295
+{{auth}}
+
+###
+# Find me
+# User, Admin
+GET {{baseUrl}}/users/me
+{{auth}}
+
+###
+# Create user
+# Admin
+POST {{baseUrl}}/users
+{{auth}}
+{{json}}
+
+{
+  "email": "admin2@example.com",
+  "password": "password123",
+  "role": "admin"
+}
+
+###
+# Update me
+# User, Admin
+PATCH {{baseUrl}}/users/me
+{{auth}}
+{{json}}
+
+{
+  "email": "admin1@example.com",
+  "currentPassword": "password123"
+}
+
+###
+# Update user
+# Admin
+PATCH {{baseUrl}}/users/6a00c5798a197fe534142f20
+{{auth}}
+{{json}}
+
+{
+  "email": "admin2@example.com",
+  "role": "admin",
+  "status": "active"
+}
+
+###
+# Soft delete user
+# Admin
+DELETE {{baseUrl}}/users/1
+{{auth}}
+
+###
+# Remove self.
+# User
+DELETE {{baseUrl}}/users/me
+{{auth}}
+
+###
+# =========================
+# Products
+# =========================
+
+###
+# Get public products
+# Public
+GET {{baseUrl}}/products
+
+###
+# Get all products
+# Admin
+GET {{baseUrl}}/products/admin
+{{auth}}
+
+###
+# Get specific product
+# Admin
+GET {{baseUrl}}/products/admin/6a01a26067dc2520bb700e7a
+{{auth}}
+
+###
+# Get specific public product by slug
+# Public
+GET {{baseUrl}}/products/slug/:slug
+
+###
+# Get specific public product by id
+# Public
+GET {{baseUrl}}/products/6a01a26067dc2520bb700e7a
+
+###
+# Create product
+# Admin
+POST {{baseUrl}}/products
+{{auth}}
+{{json}}
+
+{
+	"name": "Mechanical Keyboard K87",
+	"description": "Compact hot-swappable mechanical keyboard.",
+	"price": {
+		"amount": 29999,
+		"currency": "PLN"
+	},
+	"stock": 15,
+	"images": [
+		{
+			"url": "https://i.ytimg.com/vi/ztyjepxO7mM/hqdefault.jpg",
+			"alt": "Keyboard front view",
+			"isPrimary": true
+		}
+	],
+	"attributes": {
+		"layout": "TKL",
+		"switchType": "brown",
+		"wireless": false,
+		"color": "black"
+	},
+	"status": "active"
+}
+
+###
+# Update product
+# Admin
+PATCH {{baseUrl}}/products/6a01a26067dc2520bb700e7a
+{{auth}}
+{{json}}
+
+{
+	"status": "active"
+}
+
+# =========================
+# Products
+# =========================
+
+###
+# Get cart
+# User, Admin
+GET {{baseUrl}}/cart
+{{auth}}
+
+###
+# Add to cart
+# User, Admin
+POST {{baseUrl}}/cart/items
+{{auth}}
+{{json}}
+
+{
+	"productId": "6a01a26067dc2520bb700e7a",
+	"quantity": 2
+}
+
+###
+# Update cart item quantity
+# User, Admin
+PATCH {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
+{{auth}}
+{{json}}
+
+{
+	"quantity": 3
+}
+
+###
+# Remove item from cart
+# User, Admin
+DELETE {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
+{{auth}}
