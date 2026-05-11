@@ -259,8 +259,34 @@ POST {{baseUrl}}/orders/checkout
 	}
 }
 
-# POST /orders/checkout
-# GET  /orders/my
-# GET  /orders/:id
-# POST /payments/:id/mock-success
-# POST /payments/:id/mock-failure
+###
+# Get orders
+# User
+GET {{baseUrl}}/orders/my
+{{auth}}
+
+###
+# Get order
+# User
+GET {{baseUrl}}/orders/6a020cb567353eff5191ea4b
+{{auth}}
+
+# =========================
+# Payments
+# =========================
+
+###
+# Payment Success Mock
+# User
+POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-success
+{{auth}}
+
+###
+# Payment Failure Mock
+# User
+POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-failure
+{{auth}}
+
+
+# TODO: 
+# USE: private omitUndefinedDeep<T>(value: T): T
