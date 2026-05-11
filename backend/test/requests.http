@@ -23,6 +23,7 @@ GET {{baseUrl}}/health/db
 
 ###
 # Register
+# Public
 POST {{baseUrl}}/auth/register
 {{json}}
 
@@ -33,13 +34,20 @@ POST {{baseUrl}}/auth/register
 
 ###
 # @name login
+# Public
 POST {{baseUrl}}/auth/login
 {{json}}
 
 {
-  "email": "admin@example.com",
+  "email": "admin1@example.com",
   "password": "password123"
 }
+
+###
+# Me
+# User, Admin
+GET {{baseUrl}}/auth/me
+{{auth}}
 
 ###
 # =========================
@@ -86,18 +94,19 @@ PATCH {{baseUrl}}/users/me
 {{json}}
 
 {
-  "email": "editedSelf2@example.com",
+  "email": "admin1@example.com",
   "currentPassword": "password123"
 }
 
 ###
 # Update user
 # Admin
-PATCH {{baseUrl}}/users/69fc4f0c854dbf2bdd3f9295
+PATCH {{baseUrl}}/users/6a00c5798a197fe534142f20
 {{auth}}
 {{json}}
 
 {
+  "email": "admin2@example.com",
   "role": "admin",
   "status": "active"
 }
