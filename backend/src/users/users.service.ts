@@ -26,6 +26,22 @@ export interface PaginatedUsersResponseDto {
 	totalPages: number;
 }
 
+type CredentialUpdateDto = {
+	email?: string;
+	password?: string;
+};
+
+type CredentialUpdateInput = {
+	email?: string;
+	passwordHash?: string;
+};
+
+type AdminUpdateInput = CredentialUpdateInput&
+{
+	role?: UserRole;
+	status?: UserStatus;
+};
+
 @Injectable() export class UsersService
 {
 	constructor(
@@ -36,10 +52,9 @@ export interface PaginatedUsersResponseDto {
 
 	async create( dto: CreateUserDto ): Promise< UserResponseDto >
 	{
-		const passwordHash = await this.passwordService.hashPassword( dto.password );
+		return this.withDuplicateEmailHandling( async () => {
+			const passwordHash = await this.passwordService.hashPassword( dto.password );
 
-		try
-		{
 			const user = await this.usersRepository.create( {
 				email : dto.email,
 				passwordHash,
@@ -47,17 +62,10 @@ export interface PaginatedUsersResponseDto {
 			} );
 
 			return this.toResponseDto( user );
-		}
-		catch ( error )
-		{
-			this.handleDuplicateEmailError( error );
-			throw error;
-		}
+		} );
 	}
 
-	async findAll(
-	    query: ListUsersQueryDto,
-	    ): Promise< PaginatedUsersResponseDto >
+	async findAll( query: ListUsersQueryDto ): Promise< PaginatedUsersResponseDto >
 	{
 		const page  = query.page ?? 1;
 		const limit = query.limit ?? 20;
@@ -80,55 +88,30 @@ export interface PaginatedUsersResponseDto {
 
 	async findOne( id: ObjectId ): Promise< UserResponseDto >
 	{
-		const user = await this.usersRepository.findById( id );
-
-		if ( !user )
-		{
-			throw new NotFoundException( 'User not found' );
-		}
+		const user = await this.getUserOrThrow( id );
 
 		return this.toResponseDto( user );
 	}
 
-	async update(
-	    id: ObjectId,
-	    dto: UpdateUserDto,
-	    ): Promise< UserResponseDto >
+	async findMe( id: ObjectId ): Promise< UserResponseDto >
 	{
-		if ( dto.email === undefined && dto.password === undefined && dto.role === undefined &&
-		     dto.status === undefined )
-		{
-			throw new BadRequestException( 'At least one field must be provided' );
-		}
+		const user = await this.getActiveUserOrThrow( id );
 
-		const updateInput: { email?: string; passwordHash?: string; role?: UserRole; status?: UserStatus } = {};
+		return this.toResponseDto( user );
+	}
 
-		if ( dto.email !== undefined )
-		{
-			updateInput.email = dto.email;
-		}
+	async update( id: ObjectId, dto: UpdateUserDto ): Promise< UserResponseDto >
+	{
+		const updateInput = await this.buildAdminUpdateInput( dto );
 
-		if ( dto.password !== undefined )
-		{
-			updateInput.passwordHash = await this.passwordService.hashPassword( dto.password );
-		}
+		this.assertUpdateIsNotEmpty( updateInput );
 
-		if ( dto.role !== undefined )
-		{
-			updateInput.role = dto.role;
-		}
+		const existingUser = await this.getUserOrThrow( id );
 
-		if ( dto.status !== undefined )
-		{
-			updateInput.status = dto.status;
-		}
+		await this.ensureActiveAdminWouldRemainAfter( existingUser, updateInput );
 
-		try
-		{
-			const updatedUser = await this.usersRepository.updateById(
-			    id,
-			    updateInput,
-			);
+		return this.withDuplicateEmailHandling( async () => {
+			const updatedUser = await this.usersRepository.updateById( id, updateInput );
 
 			if ( !updatedUser )
 			{
@@ -136,17 +119,59 @@ export interface PaginatedUsersResponseDto {
 			}
 
 			return this.toResponseDto( updatedUser );
-		}
-		catch ( error )
-		{
-			this.handleDuplicateEmailError( error );
-			throw error;
-		}
+		} );
+	}
+
+	async updateMe( id: ObjectId, dto: UpdateMeDto ): Promise< UserResponseDto >
+	{
+		const updateInput = await this.buildCredentialUpdateInput( dto );
+
+		this.assertUpdateIsNotEmpty( updateInput );
+		this.assertCurrentPasswordProvided( dto );
+
+		const user = await this.getActiveUserOrThrow( id );
+
+		await this.assertCurrentPasswordMatches( dto.currentPassword ?? "", user.passwordHash );
+
+		return this.withDuplicateEmailHandling( async () => {
+			const updatedUser = await this.usersRepository.updateById( id, updateInput );
+
+			if ( !updatedUser )
+			{
+				throw new NotFoundException( 'User not found' );
+			}
+
+			return this.toResponseDto( updatedUser );
+		} );
 	}
 
 	async remove( id: ObjectId ): Promise< void >
 	{
+		const existingUser = await this.getUserOrThrow( id );
+
+		await this.ensureActiveAdminWouldRemainAfter( existingUser, {
+			status : UserStatus.Deleted,
+		} );
+
 		const deleted = await this.usersRepository.softDeleteById( id );
+
+		if ( !deleted )
+		{
+			throw new NotFoundException( 'User not found' );
+		}
+	}
+
+	async removeMe( id: ObjectId ): Promise< void >
+	{
+		const user = await this.getActiveUserOrThrow( id );
+
+		if ( user.role !== UserRole.User )
+		{
+			throw new ForbiddenException( 'Only regular users can deactivate their own account' );
+		}
+
+		const deleted = await this.usersRepository.softDeleteById( id );
+
 		if ( !deleted )
 		{
 			throw new NotFoundException( 'User not found' );
@@ -156,6 +181,142 @@ export interface PaginatedUsersResponseDto {
 	async findByEmailForAuth( email: string ): Promise< UserRecord|null >
 	{
 		return this.usersRepository.findByEmail( email.trim().toLowerCase() );
+	}
+
+	private async getUserOrThrow( id: ObjectId ): Promise< UserRecord >
+	{
+		const user = await this.usersRepository.findById( id );
+
+		if ( !user )
+		{
+			throw new NotFoundException( 'User not found' );
+		}
+
+		return user;
+	}
+
+	private async getActiveUserOrThrow( id: ObjectId ): Promise< UserRecord >
+	{
+		const user = await this.getUserOrThrow( id );
+
+		if ( user.status !== UserStatus.Active )
+		{
+			throw new NotFoundException( 'User not found' );
+		}
+
+		return user;
+	}
+
+	private async buildAdminUpdateInput( dto: UpdateUserDto ): Promise< AdminUpdateInput >
+	{
+		const credentialUpdateInput = await this.buildCredentialUpdateInput( dto );
+
+		return this.omitUndefined( {
+			...credentialUpdateInput,
+			role : dto.role,
+			status : dto.status,
+		} );
+	}
+
+	private async buildCredentialUpdateInput(
+	    dto: CredentialUpdateDto,
+	    ): Promise< CredentialUpdateInput >
+	{
+		const passwordHash =
+		    dto.password === undefined ? undefined : await this.passwordService.hashPassword( dto.password );
+
+		return this.omitUndefined( {
+			email : dto.email,
+			passwordHash,
+		} );
+	}
+
+	private assertUpdateIsNotEmpty( updateInput: object ): void
+	{
+		if ( Object.keys( updateInput ).length === 0 )
+		{
+			throw new BadRequestException( 'At least one field must be provided' );
+		}
+	}
+
+	private assertCurrentPasswordProvided( dto: UpdateMeDto ): void
+	{
+		if ( !dto.currentPassword )
+		{
+			throw new BadRequestException(
+			    'Current password is required to change email or password',
+			);
+		}
+	}
+
+	private async assertCurrentPasswordMatches(
+	    currentPassword: string,
+	    passwordHash: string,
+	    ): Promise< void >
+	{
+		const passwordMatches = await this.passwordService.verifyPassword(
+		    currentPassword,
+		    passwordHash,
+		);
+
+		if ( !passwordMatches )
+		{
+			throw new ForbiddenException( 'Current password is incorrect' );
+		}
+	}
+
+	private async ensureActiveAdminWouldRemainAfter(
+	    existingUser: UserRecord,
+	    updateInput: Pick< AdminUpdateInput, 'role'|'status' >,
+	    ): Promise< void >
+	{
+		const currentlyActiveAdmin = existingUser.role === UserRole.Admin && existingUser.status === UserStatus.Active;
+
+		if ( !currentlyActiveAdmin )
+		{
+			return;
+		}
+
+		const roleAfterUpdate   = updateInput.role ?? existingUser.role;
+		const statusAfterUpdate = updateInput.status ?? existingUser.status;
+
+		const remainsActiveAdmin = roleAfterUpdate === UserRole.Admin && statusAfterUpdate === UserStatus.Active;
+
+		if ( remainsActiveAdmin )
+		{
+			return;
+		}
+
+		const otherActiveAdmins = await this.usersRepository.countActiveAdminsExcept( existingUser._id );
+
+		if ( otherActiveAdmins === 0 )
+		{
+			throw new BadRequestException( 'Cannot remove the last active admin' );
+		}
+	}
+
+	private async withDuplicateEmailHandling< T >(
+	    operation: () => Promise< T >,
+	    ): Promise< T >
+	{
+		try
+		{
+			return await operation();
+		}
+		catch ( error )
+		{
+			if ( this.isDuplicateKeyError( error ) )
+			{
+				throw new ConflictException( 'Email is already in use' );
+			}
+
+			throw error;
+		}
+	}
+
+	private isDuplicateKeyError( error: unknown ): error is MongoServerError
+	{
+		return error instanceof MongoServerError && error.code === 11000;
 	}
 
 	private toResponseDto( user: UserRecord ): UserResponseDto
@@ -170,95 +331,11 @@ export interface PaginatedUsersResponseDto {
 			deletedAt : user.deletedAt?.toISOString(),
 		};
 	}
-	private handleDuplicateEmailError( error: unknown ): void
+
+	private omitUndefined< T extends object >( object: T ): Partial< T >
 	{
-		if ( this.isDuplicateKeyError( error ) )
-		{
-			throw new ConflictException( 'Email is already in use' );
-		}
-	}
-
-	private isDuplicateKeyError( error: unknown ): error is MongoServerError
-	{
-		return error instanceof MongoServerError && error.code === 11000;
-	}
-
-	async findMe( id: ObjectId ): Promise< UserResponseDto >
-	{
-		const user = await this.usersRepository.findById( id );
-
-		if ( !user || user.status !== UserStatus.Active )
-		{
-			throw new NotFoundException( 'User not found' );
-		}
-
-		return this.toResponseDto( user );
-	}
-
-	async updateMe(
-	    id: ObjectId,
-	    dto: UpdateMeDto,
-	    ): Promise< UserResponseDto >
-	{
-		if ( dto.email === undefined && dto.password === undefined )
-		{
-			throw new BadRequestException( 'At least one field must be provided' );
-		}
-
-		if ( !dto.currentPassword )
-		{
-			throw new BadRequestException(
-			    'Current password is required to change email or password',
-			);
-		}
-
-		const user = await this.usersRepository.findById( id );
-
-		if ( !user || user.status !== UserStatus.Active )
-		{
-			throw new NotFoundException( 'User not found' );
-		}
-
-		const passwordMatches = await this.passwordService.verifyPassword(
-		    dto.currentPassword,
-		    user.passwordHash,
-		);
-
-		if ( !passwordMatches )
-		{
-			throw new ForbiddenException( 'Current password is incorrect' );
-		}
-
-		const updateInput: { email?: string; passwordHash?: string; } = {};
-
-		if ( dto.email !== undefined )
-		{
-			updateInput.email = dto.email;
-		}
-
-		if ( dto.password !== undefined )
-		{
-			updateInput.passwordHash = await this.passwordService.hashPassword( dto.password );
-		}
-
-		try
-		{
-			const updatedUser = await this.usersRepository.updateById(
-			    id,
-			    updateInput,
-			);
-
-			if ( !updatedUser )
-			{
-				throw new NotFoundException( 'User not found' );
-			}
-
-			return this.toResponseDto( updatedUser );
-		}
-		catch ( error )
-		{
-			this.handleDuplicateEmailError( error );
-			throw error;
-		}
+		return Object.fromEntries(
+		           Object.entries( object ).filter( ( [, value ] ) => value !== undefined ),
+		           ) as Partial< T >;
 	}
 }

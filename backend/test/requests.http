@@ -90,7 +90,6 @@ PATCH {{baseUrl}}/users/me
   "currentPassword": "password123"
 }
 
-
 ###
 # Update user
 # Admin

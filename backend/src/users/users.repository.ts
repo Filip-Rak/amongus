@@ -179,6 +179,15 @@ export interface FindUsersResult {
 
 		return filter;
 	}
+
+	async countActiveAdminsExcept( id: ObjectId ): Promise< number >
+	{
+		return this.users.countDocuments( {
+			_id : { $ne : id },
+			role : UserRole.Admin,
+			status : UserStatus.Active,
+		} );
+	}
 }
 
 function escapeRegExp( value: string ): string
