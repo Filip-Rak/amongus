@@ -12,10 +12,7 @@ import {JwtAuthGuard} from './guards/jwt-auth.guard';
 import {RolesGuard} from './guards/roles.guard';
 import {JwtStrategy} from './jwt.strategy';
 
-const jwtAccessTokenExpiresIn = getEnv(
-                                    'JWT_ACCESS_TOKEN_EXPIRES_IN',
-                                    String,
-                                    ) as StringValue;
+const jwtAccessTokenExpiresIn = getEnv( 'JWT_ACCESS_TOKEN_EXPIRES_IN', String ) as StringValue;
 
 @Module( {
 	imports : [
