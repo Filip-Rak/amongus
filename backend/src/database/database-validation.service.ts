@@ -1,5 +1,5 @@
+import {isMongoNamespaceNotFoundError} from '@/common/mongo/mongo-errors';
 import {Injectable, Logger, OnModuleInit} from '@nestjs/common';
-import {MongoServerError} from 'mongodb';
 
 import {DatabaseService} from './database.service';
 
@@ -456,7 +456,7 @@ import {DatabaseService} from './database.service';
 		}
 		catch ( error )
 		{
-			if ( this.isNamespaceNotFoundError( error ) )
+			if ( isMongoNamespaceNotFoundError( error ) )
 			{
 				await db.createCollection( collectionName, {
 					validator,
@@ -470,10 +470,5 @@ import {DatabaseService} from './database.service';
 
 			throw error;
 		}
-	}
-
-	private isNamespaceNotFoundError( error: unknown ): error is MongoServerError
-	{
-		return error instanceof MongoServerError && error.codeName === 'NamespaceNotFound';
 	}
 }

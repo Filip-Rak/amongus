@@ -1,28 +1,13 @@
-import {
-	BadRequestException,
-	ConflictException,
-	Injectable,
-	NotFoundException,
-} from '@nestjs/common';
-import {MongoServerError, ObjectId} from 'mongodb';
+import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
+import {ObjectId} from 'mongodb';
 
 import {CreateProductDto} from './dto/create-product.dto';
 import {ListProductsQueryDto} from './dto/list-products-query.dto';
-import {
-	PaginatedProductsResponseDto,
-	ProductResponseDto,
-} from './dto/product-response.dto';
+import {PaginatedProductsResponseDto, ProductResponseDto} from './dto/product-response.dto';
 import {UpdateProductDto} from './dto/update-product.dto';
-import {
-	CreateProductInput,
-	ProductsRepository,
-	UpdateProductInput,
-} from './products.repository';
-import {
-	ProductAttributeValue,
-	ProductImage,
-	ProductRecord,
-} from './types/product-document.type';
+import {CreateProductInput, ProductsRepository, UpdateProductInput} from './products.repository';
+import {ProductAttributeValue, ProductImage, ProductRecord} from './types/product-document.type';
 import {ProductStatus} from './types/product-status.enum';
 
 @Injectable() export class ProductsService
@@ -323,7 +308,7 @@ import {ProductStatus} from './types/product-status.enum';
 		}
 		catch ( error )
 		{
-			if ( this.isDuplicateKeyError( error ) )
+			if ( isMongoDuplicateKeyError( error ) )
 			{
 				throw new ConflictException( 'Product slug is already in use' );
 			}
@@ -332,30 +317,20 @@ import {ProductStatus} from './types/product-status.enum';
 		}
 	}
 
-	// TODO: Extract to common.
-	private isDuplicateKeyError( error: unknown ): error is MongoServerError
-	{
-		return error instanceof MongoServerError && error.code === 11000;
-	}
-
 	private toResponseDto( product: ProductRecord ): ProductResponseDto
 	{
+		const { _id, createdAt, updatedAt, archivedAt, ...productData } = product;
+
 		return {
-			id : product._id.toHexString(),
-			name : product.name,
-			slug : product.slug,
-			description : product.description,
-			price : product.price,
-			stock : product.stock,
-			images : product.images,
-			attributes : product.attributes,
-			status : product.status,
-			createdAt : product.createdAt.toISOString(),
-			updatedAt : product.updatedAt.toISOString(),
-			archivedAt : product.archivedAt?.toISOString(),
+			id : _id.toHexString(),
+			...productData,
+			createdAt : createdAt.toISOString(),
+			updatedAt : updatedAt.toISOString(),
+			...( archivedAt && {
+				archivedAt : archivedAt.toISOString(),
+			} ),
 		};
 	}
-
 	private omitUndefined< T extends object >( object: T ): Partial< T >
 	{
 		return Object.fromEntries(

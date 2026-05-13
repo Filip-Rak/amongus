@@ -1,5 +1,6 @@
+import {isMongoDocumentValidationError} from '@/common/mongo/mongo-errors';
 import {Inject, Injectable, Logger, OnApplicationShutdown} from '@nestjs/common';
-import {ClientSession, Collection, Db, Document, MongoClient, MongoServerError, TransactionOptions} from 'mongodb';
+import {ClientSession, Collection, Db, Document, MongoClient, TransactionOptions} from 'mongodb';
 
 import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 
@@ -62,7 +63,7 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 			    error instanceof Error ? error.stack : String( error ),
 			);
 
-			if ( error instanceof MongoServerError && error.code === 121 )
+			if ( isMongoDocumentValidationError( error ) )
 			{
 				this.logger.error(
 				    'MongoDB validation details',

@@ -1,11 +1,12 @@
+import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
 import {
 	BadRequestException,
 	ConflictException,
 	ForbiddenException,
 	Injectable,
-	NotFoundException,
+	NotFoundException
 } from '@nestjs/common';
-import {MongoServerError, ObjectId} from 'mongodb';
+import {ObjectId} from 'mongodb';
 
 import {CreateUserDto} from './dto/create-user.dto';
 import {ListUsersQueryDto} from './dto/list-users-query.dto';
@@ -305,18 +306,13 @@ type AdminUpdateInput = CredentialUpdateInput&
 		}
 		catch ( error )
 		{
-			if ( this.isDuplicateKeyError( error ) )
+			if ( isMongoDuplicateKeyError( error ) )
 			{
 				throw new ConflictException( 'Email is already in use' );
 			}
 
 			throw error;
 		}
-	}
-
-	private isDuplicateKeyError( error: unknown ): error is MongoServerError
-	{
-		return error instanceof MongoServerError && error.code === 11000;
 	}
 
 	private toResponseDto( user: UserRecord ): UserResponseDto
