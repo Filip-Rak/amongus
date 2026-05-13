@@ -1,15 +1,10 @@
+import {trimLowercaseString} from '@/common/transformers/string.transformers';
 import {Transform} from 'class-transformer';
 import {IsEmail, IsString, MaxLength, MinLength} from 'class-validator';
 
 export class RegisterDto
 {
-	@Transform(
-	    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-	    ( { value } ) => typeof value === 'string' ? value.trim().toLowerCase() : value,
-	    )
-	@IsEmail()
-	@MaxLength( 254 )
-	email: string;
+	@Transform( trimLowercaseString ) @IsEmail() @MaxLength( 254 ) email: string;
 
 	@IsString() @MinLength( 6 ) @MaxLength( 128 ) password: string;
 }

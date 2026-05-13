@@ -1,3 +1,4 @@
+import {trimLowercaseString, trimString} from '@/common/transformers/string.transformers';
 import {Transform, Type} from 'class-transformer';
 import {
 	ArrayMaxSize,
@@ -22,28 +23,17 @@ import {ProductPriceDto} from './product-price.dto';
 
 export class CreateProductDto
 {
-	// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-	@Transform( ( { value } ) => typeof value === 'string' ? value.trim() : value )
-	@IsString()
-	@MinLength( 1 )
-	@MaxLength( 150 )
-	name: string;
+	@Transform( trimString ) @IsString() @MinLength( 1 ) @MaxLength( 150 ) name: string;
 
 	@IsOptional()
-	// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-	@Transform( ( { value } ) => typeof value === 'string' ? value.trim().toLowerCase() : value )
+	@Transform( trimLowercaseString )
 	@IsString()
 	@MinLength( 1 )
 	@MaxLength( 180 )
 	@Matches( /^[a-z0-9]+(?:-[a-z0-9]+)*$/ )
 	slug?: string;
 
-	// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-	@Transform( ( { value } ) => typeof value === 'string' ? value.trim() : value )
-	@IsString()
-	@MinLength( 1 )
-	@MaxLength( 5000 )
-	description: string;
+	@Transform( trimString ) @IsString() @MinLength( 1 ) @MaxLength( 5000 ) description: string;
 
 	@ValidateNested() @Type( () => ProductPriceDto ) price: ProductPriceDto;
 

@@ -1,3 +1,4 @@
+import {trimLowercaseString} from '@/common/transformers/string.transformers';
 import {Transform} from 'class-transformer';
 import {
 	IsEmail,
@@ -9,14 +10,7 @@ import {
 
 export class UpdateMeDto
 {
-	@IsOptional()
-	@Transform(
-	    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-	    ( { value } ) => typeof value === 'string' ? value.trim().toLowerCase() : value,
-	    )
-	@IsEmail()
-	@MaxLength( 254 )
-	email?: string;
+	@IsOptional() @Transform( trimLowercaseString ) @IsEmail() @MaxLength( 254 ) email?: string;
 
 	@IsOptional() @IsString() @MinLength( 6 ) @MaxLength( 128 ) password?: string;
 

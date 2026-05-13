@@ -1,3 +1,4 @@
+import {trimLowercaseString} from '@/common/transformers/string.transformers';
 import {UserRole} from '@/users/types/user-role.enum';
 import {UserStatus} from '@/users/types/user-status.enum';
 import {Transform} from 'class-transformer';
@@ -5,14 +6,7 @@ import {IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength} from 'class
 
 export class UpdateUserDto
 {
-	@IsOptional()
-	@Transform(
-	    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-	    ( { value } ) => typeof value === 'string' ? value.trim().toLowerCase() : value,
-	    )
-	@IsEmail()
-	@MaxLength( 254 )
-	email?: string;
+	@IsOptional() @Transform( trimLowercaseString ) @IsEmail() @MaxLength( 254 ) email?: string;
 
 	@IsOptional() @IsString() @MinLength( 6 ) @MaxLength( 128 ) password?: string;
 

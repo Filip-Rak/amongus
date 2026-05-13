@@ -11,7 +11,6 @@ import {OrdersService} from './orders.service';
 	imports : [
 		CartsModule,
 		ProductsModule,
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
 		forwardRef( () => PaymentsModule ),
 	],
 	controllers : [ OrdersController ],
