@@ -126,6 +126,8 @@ type ProductFindFilter = Filter< ProductDocument >&
 			images : input.images,
 			attributes : input.attributes,
 			status : input.status,
+			averageRating : 0,
+			reviewCount : 0,
 			createdAt : now,
 			updatedAt : now,
 		};
@@ -219,6 +221,27 @@ type ProductFindFilter = Filter< ProductDocument >&
 		    {
 			    returnDocument : 'after',
 			    includeResultMetadata : false,
+		    },
+		);
+	}
+
+	async updateReviewStats(
+	    id: ObjectId,
+	    stats: { averageRating: number; reviewCount : number; },
+	    options?: RepositoryOptions,
+	    ): Promise< void >
+	{
+		await this.products.updateOne(
+		    { _id : id },
+		    {
+			    $set : {
+				    averageRating : stats.averageRating,
+				    reviewCount : stats.reviewCount,
+				    updatedAt : new Date(),
+			    },
+		    },
+		    {
+			    session : options?.session,
 		    },
 		);
 	}

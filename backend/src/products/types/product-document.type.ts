@@ -29,9 +29,11 @@ export interface ProductDocument {
 
 	status: ProductStatus;
 
+	averageRating: number;
+	reviewCount: number;
+
 	createdAt: Date;
 	updatedAt: Date;
 	archivedAt?: Date;
 }
-
 export type ProductRecord = WithId< ProductDocument >;

@@ -147,6 +147,30 @@ export interface CreateOrderInput {
 		);
 	}
 
+	async findPaidOrderContainingProduct(
+	    userId: ObjectId,
+	    productId: ObjectId,
+	    options?: RepositoryOptions,
+	    ): Promise< OrderRecord|null >
+	{
+		return this.orders.findOne(
+		    {
+			    userId,
+			    status : {
+				    $in : [
+					    OrderStatus.Paid,
+					    OrderStatus.Shipped,
+					    OrderStatus.Completed,
+				    ],
+			    },
+			    'items.productId' : productId,
+		    },
+		    {
+			    session : options?.session,
+		    },
+		);
+	}
+
 	async markPaid(
 	    orderId: ObjectId,
 	    options?: RepositoryOptions,

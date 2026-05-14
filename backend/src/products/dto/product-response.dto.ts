@@ -19,6 +19,9 @@ export interface ProductResponseDto {
 
 	status: ProductStatus;
 
+	averageRating: number;
+	reviewCount: number;
+
 	createdAt: string;
 	updatedAt: string;
 	archivedAt?: string;

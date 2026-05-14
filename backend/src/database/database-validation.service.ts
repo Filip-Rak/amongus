@@ -16,6 +16,7 @@ import {DatabaseService} from './database.service';
 		await this.applyCartsValidation();
 		await this.applyOrdersValidation();
 		await this.applyPaymentsValidation();
+		await this.applyReviewsValidation();
 	}
 
 	private async applyUsersValidation(): Promise< void >
@@ -79,6 +80,8 @@ import {DatabaseService} from './database.service';
 					'images',
 					'attributes',
 					'status',
+					'averageRating',
+					'reviewCount',
 					'createdAt',
 					'updatedAt',
 				],
@@ -152,6 +155,17 @@ import {DatabaseService} from './database.service';
 					status : {
 						enum : [ 'draft', 'active', 'archived' ],
 						description : 'status must be draft, active, or archived',
+					},
+					averageRating : {
+						bsonType : [ 'double', 'int', 'long', 'decimal' ],
+						minimum : 0,
+						maximum : 5,
+						description : 'averageRating must be between 0 and 5',
+					},
+					reviewCount : {
+						bsonType : [ 'int', 'long' ],
+						minimum : 0,
+						description : 'reviewCount must be a non-negative integer',
 					},
 					createdAt : {
 						bsonType : 'date',
@@ -429,6 +443,56 @@ import {DatabaseService} from './database.service';
 						bsonType : 'date',
 					},
 					failedAt : {
+						bsonType : 'date',
+					},
+				},
+			},
+		} );
+	}
+
+	private async applyReviewsValidation(): Promise< void >
+	{
+		await this.applyCollectionValidator( 'reviews', {
+			$jsonSchema : {
+				bsonType : 'object',
+				required : [
+					'productId',
+					'userId',
+					'orderId',
+					'rating',
+					'createdAt',
+					'updatedAt',
+				],
+				properties : {
+					productId : {
+						bsonType : 'objectId',
+					},
+					userId : {
+						bsonType : 'objectId',
+					},
+					orderId : {
+						bsonType : 'objectId',
+					},
+					rating : {
+						bsonType : [ 'int', 'long' ],
+						minimum : 1,
+						maximum : 5,
+					},
+					title : {
+						bsonType : 'string',
+						maxLength : 120,
+					},
+					comment : {
+						bsonType : 'string',
+						maxLength : 2000,
+					},
+					createdAt : {
+						bsonType : 'date',
+					},
+					updatedAt : {
+						bsonType : 'date',
+					},
+					deletedAt : {
 						bsonType : 'date',
 					},
 				},

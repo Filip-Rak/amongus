@@ -290,3 +290,14 @@ POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-failure
 
 # TODO: 
 # USE: private omitUndefinedDeep<T>(value: T): T
+
+# Public:
+# GET /products/:productId/reviews
+# 
+# User:
+# POST   /products/:productId/reviews
+# PATCH  /reviews/:id
+# DELETE /reviews/:id
+# 
+# Admin:
+# DELETE /reviews/admin/:id

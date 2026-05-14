@@ -10,19 +10,21 @@ import {PaymentsModule} from './payments/payments.module';
 import {ProductsController} from './products/products.controller';
 import {ProductsModule} from './products/products.module';
 import {ProductsService} from './products/products.service';
+import {ReviewsModule} from './reviews/reviews.module';
 import {UsersController} from './users/users.controller';
 import {UsersModule} from './users/users.module';
 
 @Module( {
 	imports : [
+		AuthModule,
+		CartsModule,
 		DatabaseModule,
 		HealthModule,
-		UsersModule,
-		AuthModule,
-		ProductsModule,
-		CartsModule,
 		OrdersModule,
 		PaymentsModule,
+		ProductsModule,
+		ReviewsModule,
+		UsersModule,
 	],
 	controllers : [
 		UsersController,
