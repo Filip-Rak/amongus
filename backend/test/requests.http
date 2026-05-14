@@ -198,7 +198,7 @@ PATCH {{baseUrl}}/products/6a01a26067dc2520bb700e7a
 }
 
 # =========================
-# Products
+# Carts
 # =========================
 
 ###
@@ -216,7 +216,7 @@ POST {{baseUrl}}/cart/items
 
 {
 	"productId": "6a01a26067dc2520bb700e7a",
-	"quantity": 2
+	"quantity": 1
 }
 
 ###
@@ -277,27 +277,57 @@ GET {{baseUrl}}/orders/6a020cb567353eff5191ea4b
 
 ###
 # Payment Success Mock
-# User
+# User, Admin
 POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-success
 {{auth}}
 
 ###
 # Payment Failure Mock
-# User
+# User, Admin
 POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-failure
 {{auth}}
 
+# =========================
+# Reviews
+# =========================
 
-# TODO: 
-# USE: private omitUndefinedDeep<T>(value: T): T
+###
+# Get all reviews for a product
+# Public
+GET {{baseUrl}}/products/6a01a26067dc2520bb700e7a/reviews
 
-# Public:
-# GET /products/:productId/reviews
-# 
-# User:
-# POST   /products/:productId/reviews
-# PATCH  /reviews/:id
-# DELETE /reviews/:id
-# 
-# Admin:
-# DELETE /reviews/admin/:id
+###
+# Create review
+# User
+POST {{baseUrl}}/products/6a01a26067dc2520bb700e7a/reviews
+{{auth}}
+{{json}}
+
+{
+	"rating": 5,
+	"title": "Good product",
+	"comment": "Works as expected."
+}
+
+###
+# Update review
+# User
+PATCH {{baseUrl}}/reviews/6a057117273e9d6f5d06df3e
+{{auth}}
+{{json}}
+
+{
+	"rating": 2,
+	"title": "Changed my mind",
+	"comment": "Bad"
+}
+
+###
+# Delete review
+# User
+DELETE {{baseUrl}}/reviews/6a057117273e9d6f5d06df3e
+{{auth}}
+
+### Delete review
+DELETE {{baseUrl}}/reviews/admin/6a0574464613c3f644e73dea
+{{auth}}
