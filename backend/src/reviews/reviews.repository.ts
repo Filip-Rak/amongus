@@ -4,6 +4,7 @@ import {Injectable, OnModuleInit} from '@nestjs/common';
 import {Collection, Filter, ObjectId, UpdateFilter} from 'mongodb';
 
 import {ReviewDocument, ReviewRecord} from './types/review-document.type';
+import {ReviewStatus} from './types/review-status.enum';
 
 export interface CreateReviewInput {
 	productId: ObjectId;
@@ -59,17 +60,21 @@ export interface ReviewStats {
 		    },
 		    {
 			    unique : true,
-			    name : 'uq_reviews_product_id_user_id',
+			    name : 'uq_reviews_product_id_user_id_active',
+			    partialFilterExpression : {
+				    status : ReviewStatus.Active,
+			    },
 		    },
 		);
 
 		await this.reviews.createIndex(
 		    {
 			    productId : 1,
+			    status : 1,
 			    createdAt : -1,
 		    },
 		    {
-			    name : 'ix_reviews_product_id_created_at',
+			    name : 'ix_reviews_product_id_status_created_at',
 		    },
 		);
 
@@ -107,6 +112,7 @@ export interface ReviewStats {
 			rating : input.rating,
 			title : input.title,
 			comment : input.comment,
+			status : ReviewStatus.Active,
 			createdAt : now,
 			updatedAt : now,
 		};
@@ -129,9 +135,7 @@ export interface ReviewStats {
 		return this.reviews.findOne(
 		    {
 			    _id : id,
-			    deletedAt : {
-				    $exists : false,
-			    },
+			    status : ReviewStatus.Active,
 		    },
 		    {
 			    session : options?.session,
@@ -146,9 +150,7 @@ export interface ReviewStats {
 	{
 		const filter: Filter< ReviewDocument > = {
 			productId : input.productId,
-			deletedAt : {
-				$exists : false,
-			},
+			status : ReviewStatus.Active,
 		};
 
 		const skip = ( input.page - 1 ) * input.limit;
@@ -189,9 +191,7 @@ export interface ReviewStats {
 		return this.reviews.findOneAndUpdate(
 		    {
 			    _id : id,
-			    deletedAt : {
-				    $exists : false,
-			    },
+			    status : ReviewStatus.Active,
 		    },
 		    update,
 		    {
@@ -210,12 +210,11 @@ export interface ReviewStats {
 		const result = await this.reviews.updateOne(
 		    {
 			    _id : id,
-			    deletedAt : {
-				    $exists : false,
-			    },
+			    status : ReviewStatus.Active,
 		    },
 		    {
 			    $set : {
+				    status : ReviewStatus.Deleted,
 				    deletedAt : new Date(),
 				    updatedAt : new Date(),
 			    },
@@ -239,9 +238,7 @@ export interface ReviewStats {
 			                       {
 				                       $match : {
 					                       productId,
-					                       deletedAt : {
-						                       $exists : false,
-					                       },
+					                       status : ReviewStatus.Active,
 				                       },
 			                       },
 			                       {

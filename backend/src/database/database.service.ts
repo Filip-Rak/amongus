@@ -1,5 +1,4 @@
-import {isMongoDocumentValidationError} from '@/common/mongo/mongo-errors';
-import {Inject, Injectable, Logger, OnApplicationShutdown} from '@nestjs/common';
+import {HttpException, Inject, Injectable, Logger, OnApplicationShutdown} from '@nestjs/common';
 import {ClientSession, Collection, Db, Document, MongoClient, TransactionOptions} from 'mongodb';
 
 import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
@@ -10,6 +9,7 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 
 	constructor(
 	    @Inject( MONGO_CLIENT ) private readonly client: MongoClient,
+
 	    @Inject( MONGO_DB ) private readonly db: Db,
 	)
 	{}
@@ -21,15 +21,15 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 		return this.db.collection< TSchema >( name );
 	}
 
-	async onApplicationShutdown(): Promise< void >
+	getDb(): Db
 	{
-		this.logger.log( 'Closing MongoDB connection...' );
-		await this.client.close();
+		return this.db;
 	}
 
 	async ping(): Promise< boolean >
 	{
 		const result = await this.db.command( { ping : 1 } );
+
 		return result.ok === 1;
 	}
 
@@ -58,18 +58,7 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 		}
 		catch ( error )
 		{
-			this.logger.error(
-			    'MongoDB transaction failed',
-			    error instanceof Error ? error.stack : String( error ),
-			);
-
-			if ( isMongoDocumentValidationError( error ) )
-			{
-				this.logger.error(
-				    'MongoDB validation details',
-				    JSON.stringify( error.errInfo, null, 2 ),
-				);
-			}
+			this.logTransactionError( error );
 
 			throw error;
 		}
@@ -79,8 +68,31 @@ import {MONGO_CLIENT, MONGO_DB} from './database.tokens';
 		}
 	}
 
-	getDb(): Db
+	private logTransactionError( error: unknown ): void
 	{
-		return this.db;
+		if ( error instanceof HttpException )
+		{
+			return;
+		}
+
+		if ( error instanceof Error )
+		{
+			this.logger.error(
+			    'MongoDB transaction failed',
+			    error.stack,
+			);
+			return;
+		}
+
+		this.logger.error(
+		    'MongoDB transaction failed with a non-error value',
+		    String( error ),
+		);
+	}
+
+	async onApplicationShutdown(): Promise< void >
+	{
+		this.logger.log( 'Closing MongoDB connection...' );
+		await this.client.close();
 	}
 }
