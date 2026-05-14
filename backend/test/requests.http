@@ -40,7 +40,7 @@ POST {{baseUrl}}/auth/login
 {{json}}
 
 {
-  "email": "anthony@example.com",
+  "email": "admin1@example.com",
   "password": "password123"
 }
 
@@ -123,6 +123,63 @@ DELETE {{baseUrl}}/users/1
 DELETE {{baseUrl}}/users/me
 {{auth}}
 
+# =========================
+# Categories
+# =========================
+
+###
+# List public categories
+# Public
+GET {{baseUrl}}/categories
+
+###
+# List all categories
+# Admin
+GET {{baseUrl}}/categories/admin
+{{auth}}
+
+###
+# Get specific category
+# Admin
+GET {{baseUrl}}/categories/admin/6a05823ac121e211cbb9445c
+{{auth}}
+
+###
+# Get specific category
+# Public
+GET {{baseUrl}}/categories/6a05823ac121e211cbb9445c
+
+###
+# Add category
+# Admin
+POST {{baseUrl}}/categories
+{{auth}}
+{{json}}
+
+{
+	"name": "Keyboards",
+	"description": "Mechanical and membrane keyboards"
+}
+
+###
+# Update category
+# Admin
+PATCH {{baseUrl}}/categories/6a05823ac121e211cbb9445c
+{{auth}}
+{{json}}
+
+{
+	"name": "Keyboards",
+	"status": "active",
+	"description": "Mechanical, membrane and broken keyboards"
+}
+
+###
+# Archive category
+# Admin
+DELETE {{baseUrl}}/categories/6a05823ac121e211cbb9445c
+{{auth}}
+
 ###
 # =========================
 # Products
@@ -132,6 +189,11 @@ DELETE {{baseUrl}}/users/me
 # Get public products
 # Public
 GET {{baseUrl}}/products
+
+###
+# Get products of category
+# Public
+GET {{baseUrl}}/products?categoryId=6a05823ac121e211cbb9445c
 
 ###
 # Get all products
@@ -165,6 +227,7 @@ POST {{baseUrl}}/products
 {
 	"name": "Mechanical Keyboard K87",
 	"description": "Compact hot-swappable mechanical keyboard.",
+	"categoryId": "6a05823ac121e211cbb9445c",
 	"price": {
 		"amount": 29999,
 		"currency": "PLN"
@@ -194,6 +257,7 @@ PATCH {{baseUrl}}/products/6a01a26067dc2520bb700e7a
 {{json}}
 
 {
+	"categoryId": "6a05823ac121e211cbb9445c",
 	"status": "active"
 }
 
