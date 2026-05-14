@@ -145,9 +145,14 @@ GET {{baseUrl}}/categories/admin/6a05823ac121e211cbb9445c
 {{auth}}
 
 ###
-# Get specific category
+# Get specific public category
 # Public
 GET {{baseUrl}}/categories/6a05823ac121e211cbb9445c
+
+###
+# Get specific public category by slug
+# Public
+GET {{baseUrl}}/categories/slug/keyboards
 
 ###
 # Add category
@@ -210,7 +215,7 @@ GET {{baseUrl}}/products/admin/6a01a26067dc2520bb700e7a
 ###
 # Get specific public product by slug
 # Public
-GET {{baseUrl}}/products/slug/:slug
+GET {{baseUrl}}/products/slug/Mechanical Keyboard K87
 
 ###
 # Get specific public product by id
@@ -261,6 +266,12 @@ PATCH {{baseUrl}}/products/6a01a26067dc2520bb700e7a
 	"status": "active"
 }
 
+###
+# Archive product
+# Admin
+DELETE {{baseUrl}}/products/6a01a26067dc2520bb700e7a
+{{auth}}
+
 # =========================
 # Carts
 # =========================
@@ -298,6 +309,12 @@ PATCH {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
 # Remove item from cart
 # User
 DELETE {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
+{{auth}}
+
+###
+# Clear cart
+# User
+DELETE {{baseUrl}}/cart
 {{auth}}
 
 # =========================
@@ -350,6 +367,11 @@ POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-success
 # User, Admin
 POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-failure
 {{auth}}
+{{json}}
+
+{
+	"reason": "Insufficient funds"
+}
 
 # =========================
 # Reviews
@@ -392,6 +414,8 @@ PATCH {{baseUrl}}/reviews/6a057117273e9d6f5d06df3e
 DELETE {{baseUrl}}/reviews/6a057117273e9d6f5d06df3e
 {{auth}}
 
-### Delete review
+###
+# Delete review as admin
+# Admin
 DELETE {{baseUrl}}/reviews/admin/6a0574464613c3f644e73dea
 {{auth}}
