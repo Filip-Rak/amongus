@@ -5,6 +5,7 @@ import {
 	IsArray,
 	IsEnum,
 	IsInt,
+	IsMongoId,
 	IsObject,
 	IsOptional,
 	IsString,
@@ -49,4 +50,6 @@ export class CreateProductDto
 	@IsOptional() @IsObject() attributes?: Record< string, ProductAttributeValue >;
 
 	@IsOptional() @IsEnum( ProductStatus ) status?: ProductStatus;
+
+	@IsOptional() @IsMongoId() categoryId?: string;
 }

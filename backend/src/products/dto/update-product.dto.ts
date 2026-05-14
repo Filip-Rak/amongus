@@ -5,6 +5,7 @@ import {
 	IsArray,
 	IsEnum,
 	IsInt,
+	IsMongoId,
 	IsObject,
 	IsOptional,
 	IsString,
@@ -12,7 +13,7 @@ import {
 	MaxLength,
 	Min,
 	MinLength,
-	ValidateNested,
+	ValidateNested
 } from 'class-validator';
 
 import {ProductAttributeValue} from '../types/product-document.type';
@@ -49,4 +50,6 @@ export class UpdateProductDto
 	@IsOptional() @IsObject() attributes?: Record< string, ProductAttributeValue >;
 
 	@IsOptional() @IsEnum( ProductStatus ) status?: ProductStatus;
+
+	@IsOptional() @IsMongoId() categoryId?: string;
 }

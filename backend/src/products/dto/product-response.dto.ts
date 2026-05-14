@@ -22,6 +22,8 @@ export interface ProductResponseDto {
 	averageRating: number;
 	reviewCount: number;
 
+	categoryId?: string;
+
 	createdAt: string;
 	updatedAt: string;
 	archivedAt?: string;

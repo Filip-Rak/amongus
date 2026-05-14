@@ -17,6 +17,7 @@ import {DatabaseService} from './database.service';
 		await this.applyOrdersValidation();
 		await this.applyPaymentsValidation();
 		await this.applyReviewsValidation();
+		await this.applyCategoriesValidation();
 	}
 
 	private async applyUsersValidation(): Promise< void >
@@ -151,6 +152,9 @@ import {DatabaseService} from './database.service';
 					attributes : {
 						bsonType : 'object',
 						description : 'attributes must be an object',
+					},
+					categoryId : {
+						bsonType : 'objectId',
 					},
 					status : {
 						enum : [ 'draft', 'active', 'archived' ],
@@ -493,6 +497,51 @@ import {DatabaseService} from './database.service';
 						bsonType : 'date',
 					},
 					deletedAt : {
+						bsonType : 'date',
+					},
+				},
+			},
+		} );
+	}
+
+	private async applyCategoriesValidation(): Promise< void >
+	{
+		await this.applyCollectionValidator( 'categories', {
+			$jsonSchema : {
+				bsonType : 'object',
+				required : [
+					'name',
+					'slug',
+					'status',
+					'createdAt',
+					'updatedAt',
+				],
+				properties : {
+					name : {
+						bsonType : 'string',
+						minLength : 1,
+						maxLength : 100,
+					},
+					slug : {
+						bsonType : 'string',
+						minLength : 1,
+						maxLength : 120,
+						pattern : '^[a-z0-9]+(?:-[a-z0-9]+)*$',
+					},
+					description : {
+						bsonType : 'string',
+						maxLength : 1000,
+					},
+					status : {
+						enum : [ 'active', 'archived' ],
+					},
+					createdAt : {
+						bsonType : 'date',
+					},
+					updatedAt : {
+						bsonType : 'date',
+					},
+					archivedAt : {
 						bsonType : 'date',
 					},
 				},

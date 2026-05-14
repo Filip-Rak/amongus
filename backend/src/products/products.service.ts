@@ -1,3 +1,4 @@
+import {CategoriesRepository} from '@/categories/categories.repository';
 import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
 import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
@@ -12,7 +13,11 @@ import {ProductStatus} from './types/product-status.enum';
 
 @Injectable() export class ProductsService
 {
-	constructor( private readonly productsRepository: ProductsRepository ) {}
+	constructor(
+	    private readonly productsRepository: ProductsRepository,
+	    private readonly categoriesRepository: CategoriesRepository,
+	)
+	{}
 
 	async create( dto: CreateProductDto ): Promise< ProductResponseDto >
 	{
@@ -21,7 +26,7 @@ import {ProductStatus} from './types/product-status.enum';
 			throw new BadRequestException( 'New product cannot be archived' );
 		}
 
-		const input = this.buildCreateInput( dto );
+		const input = await this.buildCreateInput( dto );
 
 		return this.withDuplicateSlugHandling( async () => {
 			const product = await this.productsRepository.create( input );
@@ -89,7 +94,7 @@ import {ProductStatus} from './types/product-status.enum';
 	    dto: UpdateProductDto,
 	    ): Promise< ProductResponseDto >
 	{
-		const updateInput = this.buildUpdateInput( dto );
+		const updateInput = await this.buildUpdateInput( dto );
 
 		if ( Object.keys( updateInput ).length === 0 )
 		{
@@ -152,6 +157,7 @@ import {ProductStatus} from './types/product-status.enum';
 			limit,
 			search : query.search,
 			status : query.status,
+			categoryId : query.categoryId === undefined ? undefined : new ObjectId( query.categoryId ),
 			minPrice : query.minPrice,
 			maxPrice : query.maxPrice,
 			inStockOnly : query.inStockOnly,
@@ -167,10 +173,13 @@ import {ProductStatus} from './types/product-status.enum';
 		};
 	}
 
-	private buildCreateInput( dto: CreateProductDto ): CreateProductInput
+	private async buildCreateInput(
+	    dto: CreateProductDto,
+	    ): Promise< CreateProductInput >
 	{
 		const attributes = dto.attributes ?? {};
 		const images     = this.normalizeImages( dto.images ?? [] );
+		const categoryId = await this.resolveActiveCategoryId( dto.categoryId );
 
 		this.assertValidAttributes( attributes );
 
@@ -180,13 +189,14 @@ import {ProductStatus} from './types/product-status.enum';
 			description : dto.description,
 			price : dto.price,
 			stock : dto.stock,
+			categoryId,
 			images,
 			attributes,
 			status : dto.status ?? ProductStatus.Draft,
 		};
 	}
 
-	private buildUpdateInput( dto: UpdateProductDto ): UpdateProductInput
+	private async buildUpdateInput( dto: UpdateProductDto ): Promise< UpdateProductInput >
 	{
 		if ( dto.attributes !== undefined )
 		{
@@ -195,12 +205,16 @@ import {ProductStatus} from './types/product-status.enum';
 
 		const images = dto.images === undefined ? undefined : this.normalizeImages( dto.images );
 
+		const categoryId =
+		    dto.categoryId === undefined ? undefined : await this.resolveActiveCategoryId( dto.categoryId );
+
 		return this.omitUndefined( {
 			name : dto.name,
 			slug : dto.slug === undefined ? undefined : this.normalizeSlug( dto.slug ),
 			description : dto.description,
 			price : dto.price,
 			stock : dto.stock,
+			categoryId,
 			images,
 			attributes : dto.attributes,
 			status : dto.status,
@@ -319,11 +333,14 @@ import {ProductStatus} from './types/product-status.enum';
 
 	private toResponseDto( product: ProductRecord ): ProductResponseDto
 	{
-		const { _id, createdAt, updatedAt, archivedAt, ...productData } = product;
+		const { _id, categoryId, createdAt, updatedAt, archivedAt, ...productData } = product;
 
 		return {
 			id : _id.toHexString(),
 			...productData,
+			...( categoryId && {
+				categoryId : categoryId.toHexString(),
+			} ),
 			createdAt : createdAt.toISOString(),
 			updatedAt : updatedAt.toISOString(),
 			...( archivedAt && {
@@ -331,10 +348,32 @@ import {ProductStatus} from './types/product-status.enum';
 			} ),
 		};
 	}
+
 	private omitUndefined< T extends object >( object: T ): Partial< T >
 	{
 		return Object.fromEntries(
 		           Object.entries( object ).filter( ( [, value ] ) => value !== undefined ),
 		           ) as Partial< T >;
+	}
+
+	private async resolveActiveCategoryId(
+	    categoryId?: string,
+	    ): Promise< ObjectId|undefined >
+	{
+		if ( categoryId === undefined )
+		{
+			return undefined;
+		}
+
+		const objectId = new ObjectId( categoryId );
+
+		const category = await this.categoriesRepository.findActiveById( objectId );
+
+		if ( !category )
+		{
+			throw new BadRequestException( 'Category does not exist or is not active' );
+		}
+
+		return objectId;
 	}
 }

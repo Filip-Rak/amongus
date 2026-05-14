@@ -1,4 +1,4 @@
-import {WithId} from 'mongodb';
+import {ObjectId, WithId} from 'mongodb';
 
 import {Currency} from './currency.enum';
 import {ProductStatus} from './product-status.enum';
@@ -24,6 +24,8 @@ export interface ProductDocument {
 	price: ProductPrice;
 	stock: number;
 
+	categoryId?: ObjectId;
+
 	images: ProductImage[];
 	attributes: Record< string, ProductAttributeValue >;
 
@@ -36,4 +38,5 @@ export interface ProductDocument {
 	updatedAt: Date;
 	archivedAt?: Date;
 }
+
 export type ProductRecord = WithId< ProductDocument >;

@@ -3,6 +3,7 @@ import {
 	IsBoolean,
 	IsEnum,
 	IsInt,
+	IsMongoId,
 	IsOptional,
 	IsString,
 	Max,
@@ -41,4 +42,6 @@ export class ListProductsQueryDto
 	@IsOptional() @Type( () => Number ) @IsInt() @Min( 0 ) maxPrice?: number;
 
 	@IsOptional() @Transform( ( { value } ) => toBoolean( value ) ) @IsBoolean() inStockOnly?: boolean;
+
+	@IsOptional() @IsMongoId() categoryId?: string;
 }

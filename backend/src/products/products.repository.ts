@@ -8,7 +8,7 @@ import {
 	ProductDocument,
 	ProductImage,
 	ProductPrice,
-	ProductRecord,
+	ProductRecord
 } from './types/product-document.type';
 import {ProductStatus} from './types/product-status.enum';
 
@@ -18,6 +18,7 @@ export interface CreateProductInput {
 	description: string;
 	price: ProductPrice;
 	stock: number;
+	categoryId?: ObjectId;
 	images: ProductImage[];
 	attributes: Record< string, ProductAttributeValue >;
 	status: ProductStatus;
@@ -29,6 +30,7 @@ export interface UpdateProductInput {
 	description?: string;
 	price?: ProductPrice;
 	stock?: number;
+	categoryId?: ObjectId;
 	images?: ProductImage[];
 	attributes?: Record< string, ProductAttributeValue >;
 	status?: ProductStatus;
@@ -39,6 +41,7 @@ export interface FindProductsInput {
 	limit: number;
 	search?: string;
 	status?: ProductStatus;
+	categoryId?: ObjectId;
 	minPrice?: number;
 	maxPrice?: number;
 	inStockOnly?: boolean;
@@ -111,6 +114,16 @@ type ProductFindFilter = Filter< ProductDocument >&
 			    name : 'tx_products_name_description',
 		    },
 		);
+
+		await this.products.createIndex(
+		    {
+			    categoryId : 1,
+			    status : 1,
+		    },
+		    {
+			    name : 'ix_products_category_id_status',
+		    },
+		);
 	}
 
 	async create( input: CreateProductInput ): Promise< ProductRecord >
@@ -128,6 +141,7 @@ type ProductFindFilter = Filter< ProductDocument >&
 			status : input.status,
 			averageRating : 0,
 			reviewCount : 0,
+			categoryId : input.categoryId,
 			createdAt : now,
 			updatedAt : now,
 		};
@@ -379,6 +393,11 @@ type ProductFindFilter = Filter< ProductDocument >&
 			filter.stock = {
 				$gt : 0,
 			};
+		}
+
+		if ( input.categoryId )
+		{
+			filter.categoryId = input.categoryId;
 		}
 
 		return filter;
