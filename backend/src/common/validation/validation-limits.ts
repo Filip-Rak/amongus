@@ -40,3 +40,5 @@ export const STOCK_MIN        = 0;
 
 export const RATING_MIN = 1;
 export const RATING_MAX = 5;
+
+export const PAYMENT_FAILURE_REASON_MAX_LENGTH = 300;
