@@ -1,7 +1,6 @@
 import {PRICE_MIN_AMOUNT} from '@/common/validation/validation-limits';
+import {Currency} from '@/products/types/currency.enum';
 import {IsEnum, IsInt, Min} from 'class-validator';
-
-import {Currency} from '../types/currency.enum';
 
 export class ProductPriceDto
 {

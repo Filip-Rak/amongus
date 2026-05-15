@@ -1,8 +1,7 @@
 import {LIMIT_DEFAULT, LIMIT_MAX, LIMIT_MIN, PAGE_DEFAULT, PAGE_MIN} from '@/common/validation/validation-limits';
+import {UserRole} from '@/users/types/user-role.enum';
 import {Type} from 'class-transformer';
 import {IsEnum, IsInt, IsOptional, IsString, Max, Min} from 'class-validator';
-
-import {UserRole} from '../types/user-role.enum';
 
 export class ListUsersQueryDto
 {

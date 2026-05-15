@@ -1,7 +1,6 @@
 import {Public} from '@/auth/decorators/public.decorator';
+import {DatabaseService} from '@/database/database.service';
 import {Controller, Get} from '@nestjs/common';
-
-import {DatabaseService} from '../database/database.service';
 
 @Controller( 'health' ) @Public() export class HealthController
 {

@@ -6,10 +6,9 @@ import {
 	PAGE_MIN,
 	PRICE_MIN_AMOUNT
 } from '@/common/validation/validation-limits';
+import {ProductStatus} from '@/products/types/product-status.enum';
 import {Transform, Type} from 'class-transformer';
 import {IsBoolean, IsEnum, IsInt, IsMongoId, IsOptional, IsString, Max, Min} from 'class-validator';
-
-import {ProductStatus} from '../types/product-status.enum';
 
 function toBoolean( value: unknown ): unknown
 {

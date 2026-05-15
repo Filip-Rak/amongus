@@ -1,4 +1,4 @@
-import {CategoryStatus} from '../types/category-status.enum';
+import {CategoryStatus} from '@/categories/types/category-status.enum';
 
 export interface CategoryResponseDto {
 	id: string;

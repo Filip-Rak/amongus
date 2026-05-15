@@ -1,7 +1,6 @@
+import {DatabaseService} from '@/database/database.service';
 import {Injectable, OnModuleInit} from '@nestjs/common';
 import {Collection, Filter, ObjectId, UpdateFilter} from 'mongodb';
-
-import {DatabaseService} from '../database/database.service';
 
 import {UserDocument, UserRecord} from './types/user-document.type';
 import {UserRole} from './types/user-role.enum';

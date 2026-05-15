@@ -1,3 +1,4 @@
+import {CategoryStatus} from '@/categories/types/category-status.enum';
 import {trimLowercaseString, trimString} from '@/common/transformers/string.transformers';
 import {
 	CATEGORY_DESCRIPTION_MAX_LENGTH,
@@ -7,8 +8,6 @@ import {
 } from '@/common/validation/validation-limits';
 import {Transform} from 'class-transformer';
 import {IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength} from 'class-validator';
-
-import {CategoryStatus} from '../types/category-status.enum';
 
 export class CreateCategoryDto
 {
