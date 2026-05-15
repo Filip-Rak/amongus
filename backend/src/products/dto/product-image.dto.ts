@@ -1,3 +1,4 @@
+import {PRODUCT_IMAGE_ALT_MAX_LENGTH} from '@/common/validation/validation-limits';
 import {IsBoolean, IsOptional, IsString, IsUrl, MaxLength} from 'class-validator';
 
 export class ProductImageDto
@@ -9,7 +10,7 @@ export class ProductImageDto
 	} )
 	url: string;
 
-	@IsOptional() @IsString() @MaxLength( 200 ) alt?: string;
+	@IsOptional() @IsString() @MaxLength( PRODUCT_IMAGE_ALT_MAX_LENGTH ) alt?: string;
 
 	@IsBoolean() isPrimary: boolean;
 }

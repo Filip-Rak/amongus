@@ -1,9 +1,5 @@
-import {
-	ProductAttributeValue,
-	ProductImage,
-	ProductPrice,
-} from '../types/product-document.type';
-import {ProductStatus} from '../types/product-status.enum';
+import {ProductAttributeValue, ProductImage, ProductPrice} from '@/products/types/product-document.type';
+import {ProductStatus} from '@/products/types/product-status.enum';
 
 export interface ProductResponseDto {
 	id: string;

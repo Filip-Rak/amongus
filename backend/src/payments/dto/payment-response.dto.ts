@@ -1,6 +1,6 @@
+import {PaymentProvider} from '@/payments/types/payment-provider.enum';
 import {Currency} from '@/products/types/currency.enum';
 
-import {PaymentProvider} from '../types/payment-provider.enum';
 import {PaymentStatus} from '../types/payment-status.enum';
 
 export interface PaymentResponseDto {

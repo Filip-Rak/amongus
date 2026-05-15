@@ -1,22 +1,52 @@
 import {trimString} from '@/common/transformers/string.transformers';
+import {
+	ADDRESS_CITY_MAX_LENGTH,
+	ADDRESS_COUNTRY_MAX_LENGTH,
+	ADDRESS_COUNTRY_MIN_LENGTH,
+	ADDRESS_FULL_NAME_MAX_LENGTH,
+	ADDRESS_LINE_MAX_LENGTH,
+	ADDRESS_PHONE_MAX_LENGTH,
+	ADDRESS_POSTAL_CODE_MAX_LENGTH,
+	TEXT_MIN_LENGTH
+} from '@/common/validation/validation-limits';
 import {Transform, Type} from 'class-transformer';
 import {IsDefined, IsOptional, IsString, MaxLength, MinLength, ValidateNested} from 'class-validator';
 
 export class CheckoutAddressDto
 {
-	@Transform( trimString ) @IsString() @MinLength( 1 ) @MaxLength( 120 ) fullName: string;
+	@Transform( trimString )
+	@IsString()
+	@MinLength( TEXT_MIN_LENGTH )
+	@MaxLength( ADDRESS_FULL_NAME_MAX_LENGTH )
+	fullName: string;
 
-	@Transform( trimString ) @IsString() @MinLength( 1 ) @MaxLength( 200 ) line1: string;
+	@Transform( trimString )
+	@IsString()
+	@MinLength( TEXT_MIN_LENGTH )
+	@MaxLength( ADDRESS_LINE_MAX_LENGTH )
+	line1: string;
 
-	@IsOptional() @Transform( trimString ) @IsString() @MaxLength( 200 ) line2?: string;
+	@IsOptional() @Transform( trimString ) @IsString() @MaxLength( ADDRESS_LINE_MAX_LENGTH ) line2?: string;
 
-	@Transform( trimString ) @IsString() @MinLength( 1 ) @MaxLength( 100 ) city: string;
+	@Transform( trimString )
+	@IsString()
+	@MinLength( TEXT_MIN_LENGTH )
+	@MaxLength( ADDRESS_CITY_MAX_LENGTH )
+	city: string;
 
-	@Transform( trimString ) @IsString() @MinLength( 1 ) @MaxLength( 20 ) postalCode: string;
+	@Transform( trimString )
+	@IsString()
+	@MinLength( TEXT_MIN_LENGTH )
+	@MaxLength( ADDRESS_POSTAL_CODE_MAX_LENGTH )
+	postalCode: string;
 
-	@Transform( trimString ) @IsString() @MinLength( 2 ) @MaxLength( 80 ) country: string;
+	@Transform( trimString )
+	@IsString()
+	@MinLength( ADDRESS_COUNTRY_MIN_LENGTH )
+	@MaxLength( ADDRESS_COUNTRY_MAX_LENGTH )
+	country: string;
 
-	@IsOptional() @Transform( trimString ) @IsString() @MaxLength( 30 ) phone?: string;
+	@IsOptional() @Transform( trimString ) @IsString() @MaxLength( ADDRESS_PHONE_MAX_LENGTH ) phone?: string;
 }
 
 export class CheckoutDto

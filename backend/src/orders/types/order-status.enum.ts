@@ -1,4 +1,3 @@
-// TODO: Possibly remove some.
 export enum OrderStatus {
 	PendingPayment = 'pending_payment',
 	Paid           = 'paid',

@@ -1,11 +1,7 @@
+import {OrderAddressSnapshot, OrderTotals} from '@/orders/types/order-document.type';
+import {OrderStatus} from '@/orders/types/order-status.enum';
 import {PaymentResponseDto} from '@/payments/dto/payment-response.dto';
 import {Currency} from '@/products/types/currency.enum';
-
-import {
-	OrderAddressSnapshot,
-	OrderTotals,
-} from '../types/order-document.type';
-import {OrderStatus} from '../types/order-status.enum';
 
 export interface OrderItemResponseDto {
 	productId: string;

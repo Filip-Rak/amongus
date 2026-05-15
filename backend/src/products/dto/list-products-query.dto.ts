@@ -1,14 +1,13 @@
-import {Transform, Type} from 'class-transformer';
 import {
-	IsBoolean,
-	IsEnum,
-	IsInt,
-	IsMongoId,
-	IsOptional,
-	IsString,
-	Max,
-	Min,
-} from 'class-validator';
+	LIMIT_DEFAULT,
+	LIMIT_MAX,
+	LIMIT_MIN,
+	PAGE_DEFAULT,
+	PAGE_MIN,
+	PRICE_MIN_AMOUNT
+} from '@/common/validation/validation-limits';
+import {Transform, Type} from 'class-transformer';
+import {IsBoolean, IsEnum, IsInt, IsMongoId, IsOptional, IsString, Max, Min} from 'class-validator';
 
 import {ProductStatus} from '../types/product-status.enum';
 
@@ -29,17 +28,17 @@ function toBoolean( value: unknown ): unknown
 
 export class ListProductsQueryDto
 {
-	@IsOptional() @Type( () => Number ) @IsInt() @Min( 1 ) page = 1;
+	@IsOptional() @Type( () => Number ) @IsInt() @Min( PAGE_MIN ) page = PAGE_DEFAULT;
 
-	@IsOptional() @Type( () => Number ) @IsInt() @Min( 1 ) @Max( 100 ) limit = 20;
+	@IsOptional() @Type( () => Number ) @IsInt() @Min( LIMIT_MIN ) @Max( LIMIT_MAX ) limit = LIMIT_DEFAULT;
 
 	@IsOptional() @IsString() search?: string;
 
 	@IsOptional() @IsEnum( ProductStatus ) status?: ProductStatus;
 
-	@IsOptional() @Type( () => Number ) @IsInt() @Min( 0 ) minPrice?: number;
+	@IsOptional() @Type( () => Number ) @IsInt() @Min( PRICE_MIN_AMOUNT ) minPrice?: number;
 
-	@IsOptional() @Type( () => Number ) @IsInt() @Min( 0 ) maxPrice?: number;
+	@IsOptional() @Type( () => Number ) @IsInt() @Min( PRICE_MIN_AMOUNT ) maxPrice?: number;
 
 	@IsOptional() @Transform( ( { value } ) => toBoolean( value ) ) @IsBoolean() inStockOnly?: boolean;
 

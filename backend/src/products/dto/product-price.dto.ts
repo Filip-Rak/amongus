@@ -1,9 +1,10 @@
+import {PRICE_MIN_AMOUNT} from '@/common/validation/validation-limits';
 import {IsEnum, IsInt, Min} from 'class-validator';
 
 import {Currency} from '../types/currency.enum';
 
 export class ProductPriceDto
 {
-	@IsInt() @Min( 0 ) amount: number;
+	@IsInt() @Min( PRICE_MIN_AMOUNT ) amount: number;
 	@IsEnum( Currency ) currency: Currency;
 }
