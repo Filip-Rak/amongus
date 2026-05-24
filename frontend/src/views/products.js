@@ -67,12 +67,21 @@ export async function render(container) {
                         <label>Primary Image URL:</label><br>
                         <input type="url" id="product-image-url" style="width: 100%; padding: 5px; box-sizing: border-box;">
                     </div>
+
+                    <div style="margin-bottom: 15px; border: 1px solid #e9ecef; padding: 10px; border-radius: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label style="font-weight: bold;">Product Attributes:</label>
+                            <button type="button" id="add-attr-row-btn" style="padding: 2px 8px; background-color: #17a2b8; color: white; border: none; cursor: pointer; font-size: 12px;">+ Add Field</button>
+                        </div>
+                        <div id="attributes-rows-wrapper"></div>
+                    </div>
                     
                     <div style="margin-bottom: 15px; display: none;" id="product-status-group">
                         <label>Status:</label><br>
                         <select id="product-status" style="width: 100%; padding: 5px;">
                             <option value="active">Active</option>
                             <option value="inactive">Inactive</option>
+                            <option value="draft">Draft</option>
                         </select>
                     </div>
                     
@@ -92,6 +101,7 @@ function attachEventListeners(container) {
     container.querySelector('#add-product-btn').addEventListener('click', showAddForm);
     container.querySelector('#cancel-product-btn').addEventListener('click', hideForm);
     container.querySelector('#product-form').addEventListener('submit', handleFormSubmit);
+    container.querySelector('#add-attr-row-btn').addEventListener('click', () => addAttributeRow());
 
     container.querySelector('#products-tbody').addEventListener('click', (e) => {
         const id = e.target.dataset.id;
@@ -103,6 +113,29 @@ function attachEventListeners(container) {
             archiveProduct(id);
         }
     });
+
+    // Event delegation for dynamically added remove attribute buttons
+    container.querySelector('#attributes-rows-wrapper').addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-attr-btn')) {
+            e.target.closest('.attr-row').remove();
+        }
+    });
+}
+
+function addAttributeRow(key = '', value = '') {
+    const wrapper = document.getElementById('attributes-rows-wrapper');
+    const row = document.createElement('div');
+    row.classList.add('attr-row');
+    row.style.display = 'flex';
+    row.style.gap = '10px';
+    row.style.marginBottom = '8px';
+
+    row.innerHTML = `
+        <input type="text" placeholder="Key (e.g. color)" class="attr-key" value="${key}" required style="flex: 1; padding: 4px;">
+        <input type="text" placeholder="Value (e.g. black)" class="attr-value" value="${value}" required style="flex: 1; padding: 4px;">
+        <button type="button" class="remove-attr-btn" style="background-color: #dc3545; color: white; border: none; padding: 0 8px; cursor: pointer;">X</button>
+    `;
+    wrapper.appendChild(row);
 }
 
 async function loadCategories() {
@@ -119,7 +152,6 @@ async function loadCategories() {
 
 function populateCategoryDropdown() {
     const select = document.getElementById('product-category');
-    // Clear previous options except placeholder
     select.innerHTML = '<option value="">-- Select Category --</option>';
 
     categoriesList.forEach(category => {
@@ -162,11 +194,8 @@ function renderTable() {
     }
 
     tbody.innerHTML = productsData.map(product => {
-        // Find category name from local list
         const category = categoriesList.find(c => c.id === product.categoryId);
         const categoryName = category ? category.name : '<span style="color:red;">Unknown</span>';
-
-        // Format price from cents to standard decimal format
         const formattedPrice = product.price ? `${(product.price.amount / 100).toFixed(2)} ${product.price.currency}` : 'N/A';
 
         return `
@@ -190,6 +219,7 @@ function showAddForm() {
     document.getElementById('product-form-title').innerText = 'Add New Product';
     document.getElementById('product-form').reset();
     document.getElementById('product-id').value = '';
+    document.getElementById('attributes-rows-wrapper').innerHTML = '';
 
     document.getElementById('product-status-group').style.display = 'none';
     document.getElementById('product-form-container').style.display = 'block';
@@ -204,14 +234,20 @@ function showEditForm(id) {
     document.getElementById('product-name').value = product.name;
     document.getElementById('product-description').value = product.description || '';
     document.getElementById('product-category').value = product.categoryId;
-
-    // Fill price conversion from cents back to float input string
     document.getElementById('product-price').value = product.price ? (product.price.amount / 100).toFixed(2) : '';
     document.getElementById('product-stock').value = product.stock;
 
-    // Extract first image url if available
     const primaryImg = product.images && product.images.find(img => img.isPrimary);
     document.getElementById('product-image-url').value = primaryImg ? primaryImg.url : '';
+
+    // Populate dynamic attributes fields from storage object
+    const wrapper = document.getElementById('attributes-rows-wrapper');
+    wrapper.innerHTML = '';
+    if (product.attributes && Object.keys(product.attributes).length > 0) {
+        Object.entries(product.attributes).forEach(([key, value]) => {
+            addAttributeRow(key, value);
+        });
+    }
 
     document.getElementById('product-status-group').style.display = 'block';
     document.getElementById('product-status').value = product.status;
@@ -222,6 +258,7 @@ function showEditForm(id) {
 function hideForm() {
     document.getElementById('product-form-container').style.display = 'none';
     document.getElementById('product-form').reset();
+    document.getElementById('attributes-rows-wrapper').innerHTML = '';
 }
 
 async function handleFormSubmit(e) {
@@ -240,8 +277,28 @@ async function handleFormSubmit(e) {
     const isEditing = id !== '';
     submitBtn.disabled = true;
 
-    // Convert decimal price input to integer cents for the backend DTO specification
     const priceAmountCents = Math.round(priceFloat * 100);
+
+    // Build the attributes object from dynamically generated inputs
+    const attributes = {};
+    const rows = document.querySelectorAll('.attr-row');
+    rows.forEach(row => {
+        const key = row.querySelector('.attr-key').value.trim();
+        const rawValue = row.querySelector('.attr-value').value.trim();
+
+        if (key) {
+            // Automatically cast types to fulfill strict validator requirements
+            if (rawValue.toLowerCase() === 'true') {
+                attributes[key] = true;
+            } else if (rawValue.toLowerCase() === 'false') {
+                attributes[key] = false;
+            } else if (!isNaN(rawValue) && rawValue !== '') {
+                attributes[key] = Number(rawValue);
+            } else {
+                attributes[key] = rawValue;
+            }
+        }
+    });
 
     try {
         let response;
@@ -253,11 +310,14 @@ async function handleFormSubmit(e) {
                 categoryId,
                 price: { amount: priceAmountCents, currency: 'PLN' },
                 stock,
+                attributes,
                 status
             };
 
             if (imageUrl.trim() !== '') {
                 payload.images = [{ url: imageUrl, alt: name, isPrimary: true }];
+            } else {
+                payload.images = [];
             }
 
             response = await fetchWithAuth(`/products/${id}`, {
@@ -272,7 +332,7 @@ async function handleFormSubmit(e) {
                 price: { amount: priceAmountCents, currency: 'PLN' },
                 stock,
                 status: 'active',
-                attributes: {}, // Fallback schema requirement instantiation
+                attributes,
                 images: []
             };
 

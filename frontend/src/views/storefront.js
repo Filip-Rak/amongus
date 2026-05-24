@@ -42,24 +42,20 @@ export async function render(container) {
 function attachEventListeners(container) {
     const grid = container.querySelector('#products-grid');
 
-    // Grid interaction delegation handles
     grid.addEventListener('click', async (e) => {
-        const id = e.target.dataset.id;
-        if (!id) return;
+        // Intercept product title or container wrapper clicks to open details view
+        if (e.target.classList.contains('product-title-link')) {
+            const id = e.target.dataset.id;
+            document.dispatchEvent(new CustomEvent('productDetailsRequested', { detail: { productId: id } }));
+            return;
+        }
 
         if (e.target.classList.contains('add-to-cart-btn')) {
+            const id = e.target.dataset.id;
             handleAddToCart(id, e.target);
-        } else if (e.target.classList.contains('toggle-reviews-btn')) {
-            handleToggleReviews(id, e.target);
-        } else if (e.target.classList.contains('toggle-review-form-btn')) {
-            handleToggleReviewForm(id);
-        } else if (e.target.classList.contains('submit-review-btn')) {
-            e.preventDefault();
-            handleSubmitReview(id, e.target);
         }
     });
 
-    // Dropdown change event trigger local re-render
     container.querySelector('#storefront-category-filter').addEventListener('change', () => {
         renderProductsGrid();
     });
@@ -130,12 +126,9 @@ async function loadPublicProducts() {
 
 function renderProductsGrid() {
     const grid = document.getElementById('products-grid');
-
-    // Read the current chosen option state from the filter selector
     const filterSelect = document.getElementById('storefront-category-filter');
     const selectedCategoryId = filterSelect ? filterSelect.value : 'all';
 
-    // Perform filter match validation criteria checks
     let displayProducts = productsData;
     if (selectedCategoryId !== 'all') {
         displayProducts = productsData.filter(product => product.categoryId === selectedCategoryId);
@@ -151,17 +144,16 @@ function renderProductsGrid() {
         const primaryImg = product.images && product.images.find(img => img.isPrimary);
 
         const imageHtml = primaryImg && primaryImg.url
-            ? `<img src="${primaryImg.url}" alt="${primaryImg.alt || product.name}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px; margin-bottom: 15px;">`
-            : `<div style="width: 100%; height: 200px; background-color: #e9ecef; border-radius: 4px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; color: #6c757d;">No Image Available</div>`;
+            ? `<img src="${primaryImg.url}" alt="${primaryImg.alt || product.name}" class="product-title-link" data-id="${product.id}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px; margin-bottom: 15px; cursor: pointer;">`
+            : `<div class="product-title-link" data-id="${product.id}" style="width: 100%; height: 200px; background-color: #e9ecef; border-radius: 4px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; color: #6c757d; cursor: pointer;">No Image Available</div>`;
 
         const isOutOfStock = product.stock <= 0;
-        const hasPurchased = paidProductIds.includes(product.id);
 
         return `
             <div style="border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; background-color: #fff; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <div>
                     ${imageHtml}
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #333;">${product.name}</h3>
+                    <h3 class="product-title-link" data-id="${product.id}" style="margin: 0 0 10px 0; font-size: 18px; color: #007bff; cursor: pointer;">${product.name}</h3>
                     <p style="margin: 0 0 15px 0; font-size: 14px; color: #6c757d; min-height: 40px;">${product.description || ''}</p>
                 </div>
                 <div>
@@ -172,30 +164,9 @@ function renderProductsGrid() {
                         </span>
                     </div>
                     <button class="add-to-cart-btn" data-id="${product.id}" ${isOutOfStock ? 'disabled' : ''} 
-                        style="width: 100%; padding: 10px; background-color: ${isOutOfStock ? '#6c757d' : '#007bff'}; color: white; border: none; border-radius: 4px; cursor: ${isOutOfStock ? 'not-allowed' : 'pointer'}; font-weight: bold; margin-bottom: 10px;">
+                        style="width: 100%; padding: 10px; background-color: ${isOutOfStock ? '#6c757d' : '#007bff'}; color: white; border: none; border-radius: 4px; cursor: ${isOutOfStock ? 'not-allowed' : 'pointer'}; font-weight: bold;">
                         ${isOutOfStock ? 'Unavailable' : 'Add to Cart'}
                     </button>
-
-                    <div style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; display: flex; justify-content: space-between;">
-                        <button class="toggle-reviews-btn" data-id="${product.id}" style="background:none; border:none; color:#007bff; cursor:pointer; padding:0; font-size:13px;">Show Reviews</button>
-                        ${hasPurchased ? `<button class="toggle-review-form-btn" data-id="${product.id}" style="background:none; border:none; color:#28a745; cursor:pointer; padding:0; font-size:13px;">Write a Review</button>` : ''}
-                    </div>
-
-                    <div id="reviews-list-${product.id}" style="display: none; margin-top: 10px; max-height: 150px; overflow-y: auto; border-top: 1px dashed #eee; padding-top: 5px;"></div>
-
-                    <div id="review-form-${product.id}" style="display: none; margin-top: 10px; padding: 10px; border: 1px dashed #28a745; background-color: #fdfdfd; border-radius: 4px;">
-                        <h4 style="margin: 0 0 8px 0; font-size: 13px;">New Review Summary</h4>
-                        <input type="text" id="rev-title-${product.id}" placeholder="Title" required style="width:100%; margin-bottom:5px; padding:3px; font-size:12px; box-sizing:border-box;">
-                        <select id="rev-rating-${product.id}" style="width:100%; margin-bottom:5px; padding:3px; font-size:12px;">
-                            <option value="5">5 Stars</option>
-                            <option value="4">4 Stars</option>
-                            <option value="3">3 Stars</option>
-                            <option value="2">2 Stars</option>
-                            <option value="1">1 Star</option>
-                        </select>
-                        <textarea id="rev-comment-${product.id}" placeholder="Your comment text..." rows="2" required style="width:100%; margin-bottom:5px; padding:3px; font-size:12px; box-sizing:border-box;"></textarea>
-                        <button class="submit-review-btn" data-id="${product.id}" style="width:100%; padding:5px; background-color:#28a745; color:white; border:none; font-size:12px; font-weight:bold; cursor:pointer;">Submit Review</button>
-                    </div>
                 </div>
             </div>
         `;
