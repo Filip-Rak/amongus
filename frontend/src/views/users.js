@@ -50,11 +50,11 @@ export async function render(container) {
                         </select>
                     </div>
 
-                    <div style="margin-bottom: 15px; display: none;" id="status-group">
+                    <div style="margin-bottom: 15px;" id="status-group">
                         <label>Status:</label><br>
                         <select id="user-status" style="width: 100%; padding: 5px;">
                             <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
+                            <option value="deleted">Deleted</option>
                         </select>
                     </div>
                     
@@ -74,7 +74,6 @@ function attachEventListeners(container) {
     container.querySelector('#cancel-user-btn').addEventListener('click', hideForm);
     container.querySelector('#user-form').addEventListener('submit', handleFormSubmit);
 
-    // Event delegation for table action buttons
     container.querySelector('#users-tbody').addEventListener('click', (e) => {
         const id = e.target.dataset.id;
         if (!id) return;
@@ -102,7 +101,6 @@ async function loadUsers() {
             throw new Error(errorMsg);
         }
 
-        // Backend zwraca dane w obiekcie pod kluczem 'items'
         if (responseData && Array.isArray(responseData.items)) {
             usersData = responseData.items;
         } else {
@@ -112,7 +110,7 @@ async function loadUsers() {
         renderTable();
     } catch (error) {
         messageDiv.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
-        tbody.innerHTML = `<tr><td colspan="5">No data available.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4">No data available.</td></tr>`;
     }
 }
 
@@ -128,7 +126,7 @@ function renderTable() {
         <tr>
             <td>${user.email}</td>
             <td><span style="padding: 3px 6px; background-color: ${user.role === 'admin' ? '#f8d7da' : '#d1ecf1'}">${user.role}</span></td>
-            <td>${user.status || 'active'}</td>
+            <td><span style="padding: 3px 6px; background-color: ${user.status === 'active' ? '#d4edda' : '#f8d7da'}">${user.status || 'active'}</span></td>
             <td>
                 <button class="edit-btn" data-id="${user.id}">Edit</button>
                 <button class="delete-btn" data-id="${user.id}" style="color: red;">Delete</button>
@@ -143,14 +141,14 @@ function showAddForm() {
     document.getElementById('user-id').value = '';
 
     document.getElementById('user-password').required = true;
-    document.getElementById('password-group').style.display = 'block';
-    document.getElementById('status-group').style.display = 'none';
+    document.getElementById('password-hint').innerText = 'Required for new users.';
 
+    // Hide status selection for new users as backend repository assigns it automatically
+    document.getElementById('status-group').style.display = 'none';
     document.getElementById('user-form-container').style.display = 'block';
 }
 
 function showEditForm(id) {
-    // Porownujemy parametr z 'u.id' poniewaz '_id' zostal zmapowany przez backend
     const user = usersData.find(u => u.id === id);
     if (!user) return;
 
@@ -158,11 +156,15 @@ function showEditForm(id) {
     document.getElementById('user-id').value = user.id;
     document.getElementById('user-email').value = user.email;
     document.getElementById('user-role').value = user.role;
-    document.getElementById('user-status').value = user.status || 'active';
 
-    document.getElementById('password-group').style.display = 'none';
+    // Password is now optional during edit process
+    document.getElementById('user-password').value = '';
     document.getElementById('user-password').required = false;
+    document.getElementById('password-hint').innerText = 'Leave blank to keep current password.';
+
+    // Show status selection during modification
     document.getElementById('status-group').style.display = 'block';
+    document.getElementById('user-status').value = user.status || 'active';
 
     document.getElementById('user-form-container').style.display = 'block';
 }
@@ -180,6 +182,7 @@ async function handleFormSubmit(e) {
     const id = document.getElementById('user-id').value;
     const email = document.getElementById('user-email').value;
     const role = document.getElementById('user-role').value;
+    const password = document.getElementById('user-password').value.trim();
 
     const isEditing = id !== '';
     submitBtn.disabled = true;
@@ -190,12 +193,16 @@ async function handleFormSubmit(e) {
             const status = document.getElementById('user-status').value;
             const payload = { email, role, status };
 
+            // Only attach password field if administrator filled the text input
+            if (password !== '') {
+                payload.password = password;
+            }
+
             response = await fetchWithAuth(`/users/${id}`, {
                 method: 'PATCH',
                 body: JSON.stringify(payload)
             });
         } else {
-            const password = document.getElementById('user-password').value;
             const payload = { email, password, role };
 
             response = await fetchWithAuth('/users', {
@@ -205,7 +212,10 @@ async function handleFormSubmit(e) {
         }
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to save user data');
+        if (!response.ok) {
+            const errorMsg = Array.isArray(data.message) ? data.message.join(', ') : (data.message || 'Failed to save user');
+            throw new Error(errorMsg);
+        }
 
         messageDiv.innerHTML = `<span style="color: green;">User successfully saved.</span>`;
         hideForm();

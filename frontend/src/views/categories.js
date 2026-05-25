@@ -52,7 +52,7 @@ export async function render(container) {
                         <label>Status:</label><br>
                         <select id="category-status" style="width: 100%; padding: 5px;">
                             <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
+                            <option value="archived">Archived</option>
                         </select>
                     </div>
                     
@@ -89,7 +89,6 @@ async function loadCategories() {
     const messageDiv = document.getElementById('categories-message');
 
     try {
-        // Using admin endpoint to see all categories including inactive ones
         const response = await fetchWithAuth('/categories/admin');
         const responseData = await response.json();
 
@@ -104,7 +103,7 @@ async function loadCategories() {
         renderTable();
     } catch (error) {
         messageDiv.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
-        tbody.innerHTML = `<tr><td colspan="6">No data available.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5">No data available.</td></tr>`;
     }
 }
 
@@ -121,7 +120,7 @@ function renderTable() {
             <td><b>${category.name}</b></td>
             <td><code>${category.slug}</code></td>
             <td>${category.description || '<span style="color:#ccc;">No description</span>'}</td>
-            <td><span style="padding: 3px 6px; background-color: ${category.status === 'active' ? '#d4edda' : '#fff3cd'}">${category.status}</span></td>
+            <td><span style="padding: 3px 6px; background-color: ${category.status === 'active' ? '#d4edda' : '#f8d7da'}">${category.status}</span></td>
             <td>
                 <button class="edit-btn" data-id="${category.id}">Edit</button>
                 ${category.status !== 'archived' ? `<button class="archive-btn" data-id="${category.id}" style="color: orange;">Archive</button>` : ''}
@@ -149,7 +148,6 @@ function showEditForm(id) {
     document.getElementById('category-name').value = category.name;
     document.getElementById('category-description').value = category.description || '';
 
-    // Slug cannot be empty but can be updated based on service buildUpdateInput
     document.getElementById('slug-group').style.display = 'none';
     document.getElementById('category-status-group').style.display = 'block';
     document.getElementById('category-status').value = category.status;
@@ -198,7 +196,10 @@ async function handleFormSubmit(e) {
         }
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to save category');
+        if (!response.ok) {
+            const errorMsg = Array.isArray(data.message) ? data.message.join(', ') : (data.message || 'Failed to save category');
+            throw new Error(errorMsg);
+        }
 
         messageDiv.innerHTML = `<span style="color: green;">Category successfully saved.</span>`;
         hideForm();

@@ -6,6 +6,7 @@ import { render as renderStorefront } from './views/storefront.js';
 import { render as renderCart } from './views/cart.js';
 import { render as renderCheckout } from './views/checkout.js';
 import { render as renderOrders } from './views/orders.js';
+import { render as renderProductDetails } from './views/productDetails.js';
 
 const appContainer = document.querySelector('#app');
 
@@ -58,6 +59,16 @@ document.addEventListener('authSuccess', (e) => {
     document.getElementById('nav-shop-btn').addEventListener('click', () => renderStorefront(contentContainer));
     document.getElementById('nav-cart-btn').addEventListener('click', () => renderCart(contentContainer));
     document.getElementById('nav-orders-btn').addEventListener('click', () => renderOrders(contentContainer));
+
+    // Global event listener to open specific product details view
+    document.addEventListener('productDetailsRequested', (event) => {
+      renderProductDetails(contentContainer, event.detail.productId);
+    });
+
+    // Global event listener to return back to standard store view catalog
+    document.addEventListener('backToStoreRequested', () => {
+      renderStorefront(contentContainer);
+    });
 
     // Global event interceptor to route the user directly to checkout view from the cart screen
     document.addEventListener('checkoutRequested', () => {
