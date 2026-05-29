@@ -64,7 +64,7 @@ export class UpdateProductDto
 	@Type( () => ProductImageDto )
 	images?: ProductImageDto[];
 
-	@IsOptional() @IsObject() attributes?: Record< string, ProductAttributeValue >;
+	@IsOptional() @IsObject() attributeValues?: Record< string, ProductAttributeValue >;
 
 	@IsOptional() @IsEnum( ProductStatus ) status?: ProductStatus;
 

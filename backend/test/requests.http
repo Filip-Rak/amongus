@@ -130,11 +130,24 @@ DELETE {{baseUrl}}/users/me
 ###
 # List public categories
 # Public
+
+# Params:
+# 	?page=1&limit=20
+# 	?parentId=root
+# 	?parentId=<CATEGORY_ID>
+# 	?search=keyboard
 GET {{baseUrl}}/categories
 
 ###
 # List all categories
 # Admin
+
+# Params:
+# 	?page=1&limit=20
+# 	?parentId=root
+# 	?parentId=<CATEGORY_ID>
+# 	?search=keyboard
+# 	?status=archived
 GET {{baseUrl}}/categories/admin
 {{auth}}
 

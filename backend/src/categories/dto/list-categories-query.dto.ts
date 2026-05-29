@@ -1,7 +1,8 @@
-import {CategoryStatus} from '@/categories/types/category-status.enum';
 import {LIMIT_DEFAULT, LIMIT_MAX, LIMIT_MIN, PAGE_DEFAULT, PAGE_MIN} from '@/common/validation/validation-limits';
 import {Type} from 'class-transformer';
-import {IsEnum, IsInt, IsOptional, IsString, Max, Min} from 'class-validator';
+import {IsEnum, IsInt, IsOptional, IsString, Max, Min, ValidateIf} from 'class-validator';
+
+import {CategoryStatus} from '../types/category-status.enum';
 
 export class ListCategoriesQueryDto
 {
@@ -12,4 +13,6 @@ export class ListCategoriesQueryDto
 	@IsOptional() @IsString() search?: string;
 
 	@IsOptional() @IsEnum( CategoryStatus ) status?: CategoryStatus;
+
+	@IsOptional() @ValidateIf( ( _, value: unknown ) => value !== 'root' ) @IsString() parentId?: string;
 }

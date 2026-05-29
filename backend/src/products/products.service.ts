@@ -1,4 +1,7 @@
 import {CategoriesRepository} from '@/categories/categories.repository';
+import {CategoriesService} from '@/categories/categories.service';
+import {CategoryAttributeType} from '@/categories/types/category-attribute-type.enum';
+import {CategoryAttributeDefinition} from '@/categories/types/category-document.type';
 import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
 import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
@@ -16,6 +19,7 @@ import {ProductStatus} from './types/product-status.enum';
 	constructor(
 	    private readonly productsRepository: ProductsRepository,
 	    private readonly categoriesRepository: CategoriesRepository,
+	    private readonly categoriesService: CategoriesService,
 	)
 	{}
 
@@ -94,7 +98,16 @@ import {ProductStatus} from './types/product-status.enum';
 	    dto: UpdateProductDto,
 	    ): Promise< ProductResponseDto >
 	{
-		const updateInput = await this.buildUpdateInput( dto );
+		const existingProduct = await this.productsRepository.findById( id, {
+			includeInactive : true,
+		} );
+
+		if ( !existingProduct )
+		{
+			throw new NotFoundException( 'Product not found' );
+		}
+
+		const updateInput = await this.buildUpdateInput( existingProduct, dto );
 
 		if ( Object.keys( updateInput ).length === 0 )
 		{
@@ -152,12 +165,17 @@ import {ProductStatus} from './types/product-status.enum';
 		const page  = query.page ?? 1;
 		const limit = query.limit ?? 20;
 
+		const categoryIds = await this.resolveCategoryIdsForListing(
+		    query.categoryId,
+		    query.includeSubcategories,
+		);
+
 		const result = await this.productsRepository.findMany( {
 			page,
 			limit,
 			search : query.search,
 			status : query.status,
-			categoryId : query.categoryId === undefined ? undefined : new ObjectId( query.categoryId ),
+			categoryIds,
 			minPrice : query.minPrice,
 			maxPrice : query.maxPrice,
 			inStockOnly : query.inStockOnly,
@@ -177,11 +195,12 @@ import {ProductStatus} from './types/product-status.enum';
 	    dto: CreateProductDto,
 	    ): Promise< CreateProductInput >
 	{
-		const attributes = dto.attributes ?? {};
-		const images     = this.normalizeImages( dto.images ?? [] );
-		const categoryId = await this.resolveActiveCategoryId( dto.categoryId );
+		const attributeValues = dto.attributeValues ?? {};
+		const images          = this.normalizeImages( dto.images ?? [] );
+		const categoryId      = await this.resolveActiveCategoryId( dto.categoryId );
 
-		this.assertValidAttributes( attributes );
+		this.assertValidAttributeValuesObject( attributeValues );
+		await this.validateAttributeValues( categoryId, attributeValues );
 
 		return {
 			name : dto.name,
@@ -191,22 +210,29 @@ import {ProductStatus} from './types/product-status.enum';
 			stock : dto.stock,
 			categoryId,
 			images,
-			attributes,
+			attributeValues,
 			status : dto.status ?? ProductStatus.Draft,
 		};
 	}
 
-	private async buildUpdateInput( dto: UpdateProductDto ): Promise< UpdateProductInput >
+	private async buildUpdateInput(
+	    existingProduct: ProductRecord,
+	    dto: UpdateProductDto,
+	    ): Promise< UpdateProductInput >
 	{
-		if ( dto.attributes !== undefined )
-		{
-			this.assertValidAttributes( dto.attributes );
-		}
-
 		const images = dto.images === undefined ? undefined : this.normalizeImages( dto.images );
 
 		const categoryId =
 		    dto.categoryId === undefined ? undefined : await this.resolveActiveCategoryId( dto.categoryId );
+
+		const effectiveCategoryId      = categoryId ?? existingProduct.categoryId;
+		const effectiveAttributeValues = dto.attributeValues ?? existingProduct.attributeValues;
+
+		this.assertValidAttributeValuesObject( effectiveAttributeValues );
+		await this.validateAttributeValues(
+		    effectiveCategoryId,
+		    effectiveAttributeValues,
+		);
 
 		return this.omitUndefined( {
 			name : dto.name,
@@ -216,7 +242,7 @@ import {ProductStatus} from './types/product-status.enum';
 			stock : dto.stock,
 			categoryId,
 			images,
-			attributes : dto.attributes,
+			attributeValues : dto.attributeValues,
 			status : dto.status,
 		} );
 	}
@@ -338,9 +364,7 @@ import {ProductStatus} from './types/product-status.enum';
 		return {
 			id : _id.toHexString(),
 			...productData,
-			...( categoryId && {
-				categoryId : categoryId.toHexString(),
-			} ),
+			categoryId : categoryId.toHexString(),
 			createdAt : createdAt.toISOString(),
 			updatedAt : updatedAt.toISOString(),
 			...( archivedAt && {
@@ -356,9 +380,24 @@ import {ProductStatus} from './types/product-status.enum';
 		           ) as Partial< T >;
 	}
 
-	private async resolveActiveCategoryId(
+	private async resolveActiveCategoryId( categoryId: string ): Promise< ObjectId >
+	{
+		const objectId = new ObjectId( categoryId );
+
+		const category = await this.categoriesRepository.findActiveById( objectId );
+
+		if ( !category )
+		{
+			throw new BadRequestException( 'Category does not exist or is not active' );
+		}
+
+		return objectId;
+	}
+
+	private async resolveCategoryIdsForListing(
 	    categoryId?: string,
-	    ): Promise< ObjectId|undefined >
+	    includeSubcategories?: boolean,
+	    ): Promise< ObjectId[]|undefined >
 	{
 		if ( categoryId === undefined )
 		{
@@ -374,6 +413,146 @@ import {ProductStatus} from './types/product-status.enum';
 			throw new BadRequestException( 'Category does not exist or is not active' );
 		}
 
-		return objectId;
+		if ( !includeSubcategories )
+		{
+			return [ objectId ];
+		}
+
+		const descendants = await this.categoriesRepository.findDescendants( objectId );
+
+		return [
+			objectId,
+			...descendants.map( ( descendant ) => descendant._id ),
+		];
+	}
+
+	private async validateAttributeValues(
+	    categoryId: ObjectId,
+	    attributeValues: Record< string, ProductAttributeValue >,
+	    ): Promise< void >
+	{
+		const definitions = await this.categoriesService.getInheritedAttributeDefinitions( categoryId );
+
+		const definitionsByKey = new Map(
+		    definitions.map( ( definition ) => [ definition.key, definition ] ),
+		);
+
+		for ( const definition of definitions )
+		{
+			if ( definition.required && attributeValues[ definition.key ] === undefined )
+			{
+				throw new BadRequestException(
+				    `Missing required attribute "${definition.key}"`,
+				);
+			}
+		}
+
+		for ( const [ key, value ] of Object.entries( attributeValues ) )
+		{
+			const definition = definitionsByKey.get( key );
+
+			if ( !definition )
+			{
+				throw new BadRequestException(
+				    `Attribute "${key}" is not defined by the product category`,
+				);
+			}
+
+			this.assertAttributeValueMatchesDefinition( key, value, definition );
+		}
+	}
+
+	private assertAttributeValueMatchesDefinition(
+	    key: string,
+	    value: ProductAttributeValue,
+	    definition: CategoryAttributeDefinition,
+	    ): void
+	{
+		switch ( definition.type )
+		{
+		case CategoryAttributeType.String:
+			if ( typeof value !== 'string' )
+			{
+				throw new BadRequestException( `Attribute "${key}" must be a string` );
+			}
+
+			if ( definition.allowedValues && !definition.allowedValues.includes( value ) )
+			{
+				throw new BadRequestException(
+				    `Attribute "${key}" must be one of: ${definition.allowedValues.join( ', ' )}`,
+				);
+			}
+
+			return;
+
+		case CategoryAttributeType.Number:
+			if ( typeof value !== 'number' )
+			{
+				throw new BadRequestException( `Attribute "${key}" must be a number` );
+			}
+
+			if ( definition.min !== undefined && value < definition.min )
+			{
+				throw new BadRequestException(
+				    `Attribute "${key}" must be greater than or equal to ${definition.min}`,
+				);
+			}
+
+			if ( definition.max !== undefined && value > definition.max )
+			{
+				throw new BadRequestException(
+				    `Attribute "${key}" must be less than or equal to ${definition.max}`,
+				);
+			}
+
+			return;
+
+		case CategoryAttributeType.Boolean:
+			if ( typeof value !== 'boolean' )
+			{
+				throw new BadRequestException( `Attribute "${key}" must be a boolean` );
+			}
+
+			return;
+
+		case CategoryAttributeType.StringArray:
+			if ( !Array.isArray( value ) || !value.every( ( item ) => typeof item === 'string' ) )
+			{
+				throw new BadRequestException(
+				    `Attribute "${key}" must be an array of strings`,
+				);
+			}
+
+			if ( definition.allowedValues && value.some( ( item ) => !definition.allowedValues?.includes( item ) ) )
+			{
+				throw new BadRequestException(
+				    `Attribute "${key}" contains unsupported values`,
+				);
+			}
+
+			return;
+
+		default: throw new BadRequestException( `Unsupported attribute type for "${key}"` );
+		}
+	}
+
+	private assertValidAttributeValuesObject(
+	    attributeValues: Record< string, ProductAttributeValue >,
+	    ): void
+	{
+		for ( const [ key, value ] of Object.entries( attributeValues ) )
+		{
+			if ( !key.trim() )
+			{
+				throw new BadRequestException( 'Product attribute key cannot be empty' );
+			}
+
+			if ( !this.isValidAttributeValue( value ) )
+			{
+				throw new BadRequestException(
+				    `Invalid value for product attribute "${key}"`,
+				);
+			}
+		}
 	}
 }

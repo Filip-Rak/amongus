@@ -3,20 +3,11 @@ import {DatabaseService} from '@/database/database.service';
 import {PaymentsRepository} from '@/payments/payments.repository';
 import {PaymentRecord} from '@/payments/types/payment-document.type';
 import {ProductsRepository} from '@/products/products.repository';
-import {
-	BadRequestException,
-	ConflictException,
-	Injectable,
-	NotFoundException,
-} from '@nestjs/common';
+import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
 
 import {CheckoutDto} from './dto/checkout.dto';
-import {
-	CheckoutResponseDto,
-	OrderItemResponseDto,
-	OrderResponseDto,
-} from './dto/order-response.dto';
+import {CheckoutResponseDto, OrderItemResponseDto, OrderResponseDto} from './dto/order-response.dto';
 import {OrdersRepository} from './orders.repository';
 import {OrderAddressSnapshot, OrderItemSnapshot, OrderRecord} from './types/order-document.type';
 

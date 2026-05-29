@@ -62,9 +62,9 @@ export class CreateProductDto
 	@Type( () => ProductImageDto )
 	images?: ProductImageDto[];
 
-	@IsOptional() @IsObject() attributes?: Record< string, ProductAttributeValue >;
+	@IsOptional() @IsObject() attributeValues?: Record< string, ProductAttributeValue >;
 
 	@IsOptional() @IsEnum( ProductStatus ) status?: ProductStatus;
 
-	@IsOptional() @IsMongoId() categoryId?: string;
+	@IsMongoId() categoryId: string;
 }

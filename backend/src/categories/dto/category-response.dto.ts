@@ -1,16 +1,32 @@
-import {CategoryStatus} from '@/categories/types/category-status.enum';
+import {CategoryAttributeDefinition} from '../types/category-document.type';
+import {CategoryStatus} from '../types/category-status.enum';
 
 export interface CategoryResponseDto {
 	id: string;
 	name: string;
 	slug: string;
-	description?: string;
 
+	parentId?: string;
+	ancestorIds: string[];
+	level: number;
+
+	description?: string;
 	status: CategoryStatus;
+
+	attributeDefinitions: CategoryAttributeDefinition[];
 
 	createdAt: string;
 	updatedAt: string;
 	archivedAt?: string;
+}
+
+export interface CategoryTreeResponseDto extends CategoryResponseDto {
+	children: CategoryTreeResponseDto[];
+}
+
+export interface CategoryInheritedAttributesResponseDto {
+	categoryId: string;
+	attributes: CategoryAttributeDefinition[];
 }
 
 export interface PaginatedCategoriesResponseDto {

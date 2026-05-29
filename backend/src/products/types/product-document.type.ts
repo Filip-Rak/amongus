@@ -24,10 +24,10 @@ export interface ProductDocument {
 	price: ProductPrice;
 	stock: number;
 
-	categoryId?: ObjectId;
+	categoryId: ObjectId;
 
 	images: ProductImage[];
-	attributes: Record< string, ProductAttributeValue >;
+	attributeValues: Record< string, ProductAttributeValue >;
 
 	status: ProductStatus;
 

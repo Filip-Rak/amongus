@@ -6,7 +6,12 @@ import {Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post,
 import {ObjectId} from 'mongodb';
 
 import {CategoriesService} from './categories.service';
-import {CategoryResponseDto, PaginatedCategoriesResponseDto} from './dto/category-response.dto';
+import {
+	CategoryInheritedAttributesResponseDto,
+	CategoryResponseDto,
+	CategoryTreeResponseDto,
+	PaginatedCategoriesResponseDto
+} from './dto/category-response.dto';
 import {CreateCategoryDto} from './dto/create-category.dto';
 import {ListCategoriesQueryDto} from './dto/list-categories-query.dto';
 import {UpdateCategoryDto} from './dto/update-category.dto';
@@ -22,6 +27,16 @@ import {UpdateCategoryDto} from './dto/update-category.dto';
 	    ): Promise< PaginatedCategoriesResponseDto >
 	{
 		return this.categoriesService.findPublic( query );
+	}
+
+	@Public() @Get( 'tree' ) findTree(): Promise< CategoryTreeResponseDto[] >
+	{
+		return this.categoriesService.findTree();
+	}
+
+	@Public() @Get( 'root' ) findRootChildren(): Promise< CategoryResponseDto[] >
+	{
+		return this.categoriesService.findRootChildren();
 	}
 
 	@Get( 'admin' )
@@ -49,6 +64,33 @@ import {UpdateCategoryDto} from './dto/update-category.dto';
 	    ): Promise< CategoryResponseDto >
 	{
 		return this.categoriesService.findBySlugPublic( slug );
+	}
+
+	@Public()
+	@Get( ':id/children' )
+	findChildren(
+	    @Param( 'id', ParseObjectIdPipe ) id: ObjectId,
+	    ): Promise< CategoryResponseDto[] >
+	{
+		return this.categoriesService.findChildren( id );
+	}
+
+	@Public()
+	@Get( ':id/tree' )
+	findSubtree(
+	    @Param( 'id', ParseObjectIdPipe ) id: ObjectId,
+	    ): Promise< CategoryTreeResponseDto >
+	{
+		return this.categoriesService.findSubtree( id );
+	}
+
+	@Public()
+	@Get( ':id/attributes' )
+	findInheritedAttributes(
+	    @Param( 'id', ParseObjectIdPipe ) id: ObjectId,
+	    ): Promise< CategoryInheritedAttributesResponseDto >
+	{
+		return this.categoriesService.findInheritedAttributes( id );
 	}
 
 	@Public()

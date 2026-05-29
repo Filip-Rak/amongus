@@ -1,5 +1,5 @@
-import {ProductAttributeValue, ProductImage, ProductPrice} from '@/products/types/product-document.type';
-import {ProductStatus} from '@/products/types/product-status.enum';
+import {ProductAttributeValue, ProductImage, ProductPrice} from '../types/product-document.type';
+import {ProductStatus} from '../types/product-status.enum';
 
 export interface ProductResponseDto {
 	id: string;
@@ -10,15 +10,15 @@ export interface ProductResponseDto {
 	price: ProductPrice;
 	stock: number;
 
+	categoryId: string;
+
 	images: ProductImage[];
-	attributes: Record< string, ProductAttributeValue >;
+	attributeValues: Record< string, ProductAttributeValue >;
 
 	status: ProductStatus;
 
 	averageRating: number;
 	reviewCount: number;
-
-	categoryId?: string;
 
 	createdAt: string;
 	updatedAt: string;

@@ -42,4 +42,6 @@ export class ListProductsQueryDto
 	@IsOptional() @Transform( ( { value } ) => toBoolean( value ) ) @IsBoolean() inStockOnly?: boolean;
 
 	@IsOptional() @IsMongoId() categoryId?: string;
+
+	@IsOptional() @Transform( ( { value } ) => toBoolean( value ) ) @IsBoolean() includeSubcategories?: boolean;
 }

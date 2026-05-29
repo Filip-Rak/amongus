@@ -24,8 +24,9 @@ export const productValidator: CollectionValidatorDefinition = {
 				'description',
 				'price',
 				'stock',
+				'categoryId',
 				'images',
-				'attributes',
+				'attributeValues',
 				'status',
 				'averageRating',
 				'reviewCount',
@@ -97,13 +98,13 @@ export const productValidator: CollectionValidatorDefinition = {
 						},
 					},
 				},
-				attributes : {
-					bsonType : 'object',
-					description : 'attributes must be an object',
-				},
 				categoryId : {
 					bsonType : 'objectId',
-					description : 'categoryId must be an ObjectId when present',
+					description : 'categoryId must be an ObjectId and is required',
+				},
+				attributeValues : {
+					bsonType : 'object',
+					description : 'attributeValues must be an object',
 				},
 				status : {
 					enum : [ 'draft', 'active', 'archived' ],

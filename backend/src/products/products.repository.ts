@@ -18,9 +18,9 @@ export interface CreateProductInput {
 	description: string;
 	price: ProductPrice;
 	stock: number;
-	categoryId?: ObjectId;
+	categoryId: ObjectId;
 	images: ProductImage[];
-	attributes: Record< string, ProductAttributeValue >;
+	attributeValues: Record< string, ProductAttributeValue >;
 	status: ProductStatus;
 }
 
@@ -32,7 +32,7 @@ export interface UpdateProductInput {
 	stock?: number;
 	categoryId?: ObjectId;
 	images?: ProductImage[];
-	attributes?: Record< string, ProductAttributeValue >;
+	attributeValues?: Record< string, ProductAttributeValue >;
 	status?: ProductStatus;
 }
 
@@ -41,7 +41,7 @@ export interface FindProductsInput {
 	limit: number;
 	search?: string;
 	status?: ProductStatus;
-	categoryId?: ObjectId;
+	categoryIds?: ObjectId[];
 	minPrice?: number;
 	maxPrice?: number;
 	inStockOnly?: boolean;
@@ -136,12 +136,12 @@ type ProductFindFilter = Filter< ProductDocument >&
 			description : input.description,
 			price : input.price,
 			stock : input.stock,
+			categoryId : input.categoryId,
 			images : input.images,
-			attributes : input.attributes,
+			attributeValues : input.attributeValues,
 			status : input.status,
 			averageRating : 0,
 			reviewCount : 0,
-			categoryId : input.categoryId,
 			createdAt : now,
 			updatedAt : now,
 		};
@@ -395,9 +395,11 @@ type ProductFindFilter = Filter< ProductDocument >&
 			};
 		}
 
-		if ( input.categoryId )
+		if ( input.categoryIds && input.categoryIds.length > 0 )
 		{
-			filter.categoryId = input.categoryId;
+			filter.categoryId = {
+				$in : input.categoryIds,
+			};
 		}
 
 		return filter;

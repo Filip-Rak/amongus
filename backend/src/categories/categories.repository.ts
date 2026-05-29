@@ -3,14 +3,18 @@ import {DatabaseService} from '@/database/database.service';
 import {Injectable, OnModuleInit} from '@nestjs/common';
 import {Collection, Filter, ObjectId, UpdateFilter} from 'mongodb';
 
-import {CategoryDocument, CategoryRecord} from './types/category-document.type';
+import {CategoryAttributeDefinition, CategoryDocument, CategoryRecord} from './types/category-document.type';
 import {CategoryStatus} from './types/category-status.enum';
 
 export interface CreateCategoryInput {
 	name: string;
 	slug: string;
+	parentId?: ObjectId;
+	ancestorIds: ObjectId[];
+	level: number;
 	description?: string;
 	status: CategoryStatus;
+	attributeDefinitions: CategoryAttributeDefinition[];
 }
 
 export interface UpdateCategoryInput {
@@ -18,6 +22,7 @@ export interface UpdateCategoryInput {
 	slug?: string;
 	description?: string;
 	status?: CategoryStatus;
+	attributeDefinitions?: CategoryAttributeDefinition[];
 }
 
 export interface FindCategoriesInput {
@@ -25,6 +30,7 @@ export interface FindCategoriesInput {
 	limit: number;
 	search?: string;
 	status?: CategoryStatus;
+	parentId?: ObjectId|null;
 	includeInactive: boolean;
 }
 
@@ -47,39 +53,6 @@ export interface FindCategoriesResult {
 		await this.ensureIndexes();
 	}
 
-	private async ensureIndexes(): Promise< void >
-	{
-		await this.categories.createIndex(
-		    {
-			    slug : 1,
-		    },
-		    {
-			    unique : true,
-			    name : 'uq_categories_slug',
-		    },
-		);
-
-		await this.categories.createIndex(
-		    {
-			    status : 1,
-			    name : 1,
-		    },
-		    {
-			    name : 'ix_categories_status_name',
-		    },
-		);
-
-		await this.categories.createIndex(
-		    {
-			    name : 'text',
-			    description : 'text',
-		    },
-		    {
-			    name : 'tx_categories_name_description',
-		    },
-		);
-	}
-
 	async create( input: CreateCategoryInput ): Promise< CategoryRecord >
 	{
 		const now = new Date();
@@ -87,8 +60,12 @@ export interface FindCategoriesResult {
 		const document: CategoryDocument = {
 			name : input.name,
 			slug : input.slug,
+			parentId : input.parentId,
+			ancestorIds : input.ancestorIds,
+			level : input.level,
 			description : input.description,
 			status : input.status,
+			attributeDefinitions : input.attributeDefinitions,
 			createdAt : now,
 			updatedAt : now,
 		};
@@ -107,7 +84,7 @@ export interface FindCategoriesResult {
 		const skip   = ( input.page - 1 ) * input.limit;
 
 		const [ categories, total ] = await Promise.all( [
-			this.categories.find( filter ).sort( { name : 1 } ).skip( skip ).limit( input.limit ).toArray(),
+			this.categories.find( filter ).sort( { level : 1, name : 1 } ).skip( skip ).limit( input.limit ).toArray(),
 			this.categories.countDocuments( filter ),
 		] );
 
@@ -134,6 +111,35 @@ export interface FindCategoriesResult {
 		return this.categories.findOne( filter, {
 			session : options?.session,
 		} );
+	}
+
+	async findByIds(
+	    ids: ObjectId[],
+	    options?: RepositoryOptions&{ includeInactive?: boolean },
+	    ): Promise< CategoryRecord[] >
+	{
+		if ( ids.length === 0 )
+		{
+			return [];
+		}
+
+		const filter: Filter< CategoryDocument > = {
+			_id : {
+				$in : ids,
+			},
+		};
+
+		if ( !options?.includeInactive )
+		{
+			filter.status = CategoryStatus.Active;
+		}
+
+		return this.categories
+		    .find( filter, {
+			    session : options?.session,
+		    } )
+		    .sort( { level : 1 } )
+		    .toArray();
 	}
 
 	async findBySlug(
@@ -169,6 +175,68 @@ export interface FindCategoriesResult {
 			    session : options?.session,
 		    },
 		);
+	}
+
+	async findChildren(
+	    parentId: ObjectId|null,
+	    options?: RepositoryOptions&{ includeInactive?: boolean },
+	    ): Promise< CategoryRecord[] >
+	{
+		const filter: Filter< CategoryDocument > =
+		    parentId === null ? { parentId : { $exists : false } } : { parentId };
+
+		if ( !options?.includeInactive )
+		{
+			filter.status = CategoryStatus.Active;
+		}
+
+		return this.categories
+		    .find( filter, {
+			    session : options?.session,
+		    } )
+		    .sort( { name : 1 } )
+		    .toArray();
+	}
+
+	async findDescendants(
+	    categoryId: ObjectId,
+	    options?: RepositoryOptions&{ includeInactive?: boolean },
+	    ): Promise< CategoryRecord[] >
+	{
+		const filter: Filter< CategoryDocument > = {
+			ancestorIds : categoryId,
+		};
+
+		if ( !options?.includeInactive )
+		{
+			filter.status = CategoryStatus.Active;
+		}
+
+		return this.categories
+		    .find( filter, {
+			    session : options?.session,
+		    } )
+		    .sort( { level : 1, name : 1 } )
+		    .toArray();
+	}
+
+	async findAllForTree(
+	    options?: RepositoryOptions&{ includeInactive?: boolean },
+	    ): Promise< CategoryRecord[] >
+	{
+		const filter: Filter< CategoryDocument > = {};
+
+		if ( !options?.includeInactive )
+		{
+			filter.status = CategoryStatus.Active;
+		}
+
+		return this.categories
+		    .find( filter, {
+			    session : options?.session,
+		    } )
+		    .sort( { level : 1, name : 1 } )
+		    .toArray();
 	}
 
 	async updateById(
@@ -233,6 +301,61 @@ export interface FindCategoriesResult {
 		return result.modifiedCount === 1;
 	}
 
+	private async ensureIndexes(): Promise< void >
+	{
+		await this.categories.createIndex(
+		    {
+			    slug : 1,
+		    },
+		    {
+			    unique : true,
+			    name : 'uq_categories_slug',
+		    },
+		);
+
+		await this.categories.createIndex(
+		    {
+			    parentId : 1,
+			    status : 1,
+			    name : 1,
+		    },
+		    {
+			    name : 'ix_categories_parent_id_status_name',
+		    },
+		);
+
+		await this.categories.createIndex(
+		    {
+			    ancestorIds : 1,
+			    status : 1,
+		    },
+		    {
+			    name : 'ix_categories_ancestor_ids_status',
+		    },
+		);
+
+		await this.categories.createIndex(
+		    {
+			    status : 1,
+			    level : 1,
+			    name : 1,
+		    },
+		    {
+			    name : 'ix_categories_status_level_name',
+		    },
+		);
+
+		await this.categories.createIndex(
+		    {
+			    name : 'text',
+			    description : 'text',
+		    },
+		    {
+			    name : 'tx_categories_name_description',
+		    },
+		);
+	}
+
 	private buildFindManyFilter(
 	    input: FindCategoriesInput,
 	    ): Filter< CategoryDocument >
@@ -246,6 +369,20 @@ export interface FindCategoriesResult {
 		else if ( input.status )
 		{
 			filter.status = input.status;
+		}
+
+		if ( input.parentId !== undefined )
+		{
+			if ( input.parentId === null )
+			{
+				filter.parentId = {
+					$exists : false,
+				};
+			}
+			else
+			{
+				filter.parentId = input.parentId;
+			}
 		}
 
 		if ( input.search?.trim() )

@@ -1,13 +1,31 @@
 import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
-import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
+import {CATEGORY_MAX_DEPTH} from '@/common/validation/validation-limits';
+import {
+	BadRequestException,
+	ConflictException,
+	Injectable,
+	NotFoundException,
+} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
 
-import {CategoriesRepository, CreateCategoryInput, UpdateCategoryInput} from './categories.repository';
-import {CategoryResponseDto, PaginatedCategoriesResponseDto} from './dto/category-response.dto';
+import {
+	CategoriesRepository,
+	CreateCategoryInput,
+	UpdateCategoryInput,
+} from './categories.repository';
+import {
+	CategoryInheritedAttributesResponseDto,
+	CategoryResponseDto,
+	CategoryTreeResponseDto,
+	PaginatedCategoriesResponseDto,
+} from './dto/category-response.dto';
 import {CreateCategoryDto} from './dto/create-category.dto';
 import {ListCategoriesQueryDto} from './dto/list-categories-query.dto';
 import {UpdateCategoryDto} from './dto/update-category.dto';
-import {CategoryRecord} from './types/category-document.type';
+import {
+	CategoryAttributeDefinition,
+	CategoryRecord,
+} from './types/category-document.type';
 import {CategoryStatus} from './types/category-status.enum';
 
 @Injectable() export class CategoriesService
@@ -21,7 +39,7 @@ import {CategoryStatus} from './types/category-status.enum';
 			throw new BadRequestException( 'New category cannot be archived' );
 		}
 
-		const input = this.buildCreateInput( dto );
+		const input = await this.buildCreateInput( dto );
 
 		return this.withDuplicateSlugHandling( async () => {
 			const category = await this.categoriesRepository.create( input );
@@ -42,6 +60,87 @@ import {CategoryStatus} from './types/category-status.enum';
 	    ): Promise< PaginatedCategoriesResponseDto >
 	{
 		return this.findMany( query, true );
+	}
+
+	async findTree(): Promise< CategoryTreeResponseDto[] >
+	{
+		const categories = await this.categoriesRepository.findAllForTree();
+
+		return this.buildForest( categories );
+	}
+
+	async findSubtree( id: ObjectId ): Promise< CategoryTreeResponseDto >
+	{
+		const root = await this.categoriesRepository.findById( id );
+
+		if ( !root )
+		{
+			throw new NotFoundException( 'Category not found' );
+		}
+
+		const descendants = await this.categoriesRepository.findDescendants( id );
+
+		const [ tree ] = this.buildForest( [ root, ...descendants ] );
+
+		if ( !tree )
+		{
+			throw new NotFoundException( 'Category not found' );
+		}
+
+		return tree;
+	}
+
+	async findChildren( id: ObjectId ): Promise< CategoryResponseDto[] >
+	{
+		const category = await this.categoriesRepository.findById( id );
+
+		if ( !category )
+		{
+			throw new NotFoundException( 'Category not found' );
+		}
+
+		const children = await this.categoriesRepository.findChildren( id );
+
+		return children.map( ( child ) => this.toResponseDto( child ) );
+	}
+
+	async findRootChildren(): Promise< CategoryResponseDto[] >
+	{
+		const children = await this.categoriesRepository.findChildren( null );
+
+		return children.map( ( child ) => this.toResponseDto( child ) );
+	}
+
+	async findInheritedAttributes(
+	    id: ObjectId,
+	    ): Promise< CategoryInheritedAttributesResponseDto >
+	{
+		const attributes = await this.getInheritedAttributeDefinitions( id );
+
+		return {
+			categoryId : id.toHexString(),
+			attributes,
+		};
+	}
+
+	async getInheritedAttributeDefinitions(
+	    categoryId: ObjectId,
+	    ): Promise< CategoryAttributeDefinition[] >
+	{
+		const category = await this.categoriesRepository.findById( categoryId );
+
+		if ( !category )
+		{
+			throw new NotFoundException( 'Category not found' );
+		}
+
+		const ancestors = await this.categoriesRepository.findByIds(
+		    category.ancestorIds,
+		);
+
+		const chain = [...ancestors, category ].sort( ( a, b ) => a.level - b.level );
+
+		return this.mergeAttributeDefinitions( chain );
 	}
 
 	async findOnePublic( id: ObjectId ): Promise< CategoryResponseDto >
@@ -89,11 +188,18 @@ import {CategoryStatus} from './types/category-status.enum';
 	    dto: UpdateCategoryDto,
 	    ): Promise< CategoryResponseDto >
 	{
-		const updateInput = this.buildUpdateInput( dto );
+		const existingCategory = await this.categoriesRepository.findById( id, {
+			includeInactive : true,
+		} );
+
+		if ( !existingCategory )
+		{
+			throw new NotFoundException( 'Category not found' );
+		}
+
+		const updateInput = await this.buildUpdateInput( existingCategory, dto );
 
 		this.assertUpdateIsNotEmpty( updateInput );
-
-		await this.findOneAdmin( id );
 
 		return this.withDuplicateSlugHandling( async () => {
 			const updatedCategory = await this.categoriesRepository.updateById(
@@ -121,6 +227,17 @@ import {CategoryStatus} from './types/category-status.enum';
 			throw new NotFoundException( 'Category not found' );
 		}
 
+		const children = await this.categoriesRepository.findChildren( id, {
+			includeInactive : true,
+		} );
+
+		if ( children.length > 0 )
+		{
+			throw new ConflictException(
+			    'Cannot archive a category that has child categories',
+			);
+		}
+
 		if ( category.status === CategoryStatus.Archived )
 		{
 			return;
@@ -142,11 +259,16 @@ import {CategoryStatus} from './types/category-status.enum';
 		const page  = query.page ?? 1;
 		const limit = query.limit ?? 20;
 
+		const parentId = query.parentId === undefined ? undefined
+		                 : query.parentId === 'root'  ? null
+		                                              : new ObjectId( query.parentId );
+
 		const result = await this.categoriesRepository.findMany( {
 			page,
 			limit,
 			search : query.search,
 			status : query.status,
+			parentId,
 			includeInactive,
 		} );
 
@@ -159,24 +281,222 @@ import {CategoryStatus} from './types/category-status.enum';
 		};
 	}
 
-	private buildCreateInput( dto: CreateCategoryDto ): CreateCategoryInput
+	private async buildCreateInput(
+	    dto: CreateCategoryDto,
+	    ): Promise< CreateCategoryInput >
 	{
+		const parent               = await this.resolveParent( dto.parentId );
+		const attributeDefinitions = dto.attributeDefinitions ?? [];
+
+		this.assertUniqueAttributeKeys( attributeDefinitions );
+
+		if ( parent )
+		{
+			this.assertMaxDepth( parent );
+			await this.assertNoInheritedAttributeKeyConflicts(
+			    parent,
+			    attributeDefinitions,
+			);
+		}
+
 		return {
 			name : dto.name,
 			slug : dto.slug ? this.normalizeSlug( dto.slug ) : this.slugify( dto.name ),
+			parentId : parent?._id,
+			ancestorIds : parent ? [...parent.ancestorIds, parent._id ] : [],
+			level : parent ? parent.level + 1 : 0,
 			description : dto.description,
 			status : dto.status ?? CategoryStatus.Active,
+			attributeDefinitions,
 		};
 	}
 
-	private buildUpdateInput( dto: UpdateCategoryDto ): UpdateCategoryInput
+	private async buildUpdateInput(
+	    existingCategory: CategoryRecord,
+	    dto: UpdateCategoryDto,
+	    ): Promise< UpdateCategoryInput >
 	{
+		if ( dto.attributeDefinitions !== undefined )
+		{
+			this.assertUniqueAttributeKeys( dto.attributeDefinitions );
+
+			const ancestors = await this.categoriesRepository.findByIds(
+			    existingCategory.ancestorIds,
+			    {
+				    includeInactive : true,
+			    },
+			);
+
+			const inheritedKeys = new Set(
+			    ancestors.flatMap(
+			        ( ancestor ) => ancestor.attributeDefinitions.map( ( definition ) => definition.key ),
+			        ),
+			);
+
+			for ( const definition of dto.attributeDefinitions )
+			{
+				if ( inheritedKeys.has( definition.key ) )
+				{
+					throw new ConflictException(
+					    `Attribute "${definition.key}" is already defined by an ancestor category`,
+					);
+				}
+			}
+		}
+
 		return this.omitUndefined( {
 			name : dto.name,
 			slug : dto.slug === undefined ? undefined : this.normalizeSlug( dto.slug ),
 			description : dto.description,
 			status : dto.status,
+			attributeDefinitions : dto.attributeDefinitions,
 		} );
+	}
+
+	private async resolveParent( parentId?: string ): Promise< CategoryRecord|null >
+	{
+		if ( parentId === undefined )
+		{
+			return null;
+		}
+
+		const parent = await this.categoriesRepository.findById(
+		    new ObjectId( parentId ),
+		);
+
+		if ( !parent )
+		{
+			throw new BadRequestException( 'Parent category does not exist or is not active' );
+		}
+
+		return parent;
+	}
+
+	private assertMaxDepth( parent: CategoryRecord ): void
+	{
+		if ( parent.level + 1 > CATEGORY_MAX_DEPTH )
+		{
+			throw new BadRequestException(
+			    `Category depth cannot exceed ${CATEGORY_MAX_DEPTH}`,
+			);
+		}
+	}
+
+	private async assertNoInheritedAttributeKeyConflicts(
+	    parent: CategoryRecord,
+	    attributeDefinitions: CategoryAttributeDefinition[],
+	    ): Promise< void >
+	{
+		const inheritedDefinitions = await this.getInheritedAttributeDefinitions(
+		    parent._id,
+		);
+
+		const inheritedKeys = new Set(
+		    inheritedDefinitions.map( ( definition ) => definition.key ),
+		);
+
+		for ( const definition of attributeDefinitions )
+		{
+			if ( inheritedKeys.has( definition.key ) )
+			{
+				throw new ConflictException(
+				    `Attribute "${definition.key}" is already defined by an ancestor category`,
+				);
+			}
+		}
+	}
+
+	private assertUniqueAttributeKeys(
+	    attributeDefinitions: CategoryAttributeDefinition[],
+	    ): void
+	{
+		const keys = new Set< string >();
+
+		for ( const definition of attributeDefinitions )
+		{
+			if ( keys.has( definition.key ) )
+			{
+				throw new BadRequestException(
+				    `Duplicate attribute definition key "${definition.key}"`,
+				);
+			}
+
+			if ( definition.min !== undefined && definition.max !== undefined && definition.min > definition.max )
+			{
+				throw new BadRequestException(
+				    `Attribute "${definition.key}" min cannot be greater than max`,
+				);
+			}
+
+			keys.add( definition.key );
+		}
+	}
+
+	private mergeAttributeDefinitions(
+	    categories: CategoryRecord[],
+	    ): CategoryAttributeDefinition[]
+	{
+		const definitionsByKey = new Map< string, CategoryAttributeDefinition >();
+
+		for ( const category of categories )
+		{
+			for ( const definition of category.attributeDefinitions )
+			{
+				if ( definitionsByKey.has( definition.key ) )
+				{
+					throw new ConflictException(
+					    `Duplicate inherited attribute key "${definition.key}"`,
+					);
+				}
+
+				definitionsByKey.set( definition.key, definition );
+			}
+		}
+
+		return [...definitionsByKey.values() ];
+	}
+
+	private buildForest( categories: CategoryRecord[] ): CategoryTreeResponseDto[]
+	{
+		const nodesById = new Map< string, CategoryTreeResponseDto >();
+
+		for ( const category of categories )
+		{
+			nodesById.set( category._id.toHexString(), {
+				...this.toResponseDto( category ),
+				children : [],
+			} );
+		}
+
+		const roots: CategoryTreeResponseDto[] = [];
+
+		for ( const category of categories )
+		{
+			const node = nodesById.get( category._id.toHexString() );
+
+			if ( !node )
+			{
+				continue;
+			}
+
+			if ( !category.parentId )
+			{
+				roots.push( node );
+				continue;
+			}
+
+			const parent = nodesById.get( category.parentId.toHexString() );
+
+			if ( !parent )
+			{
+				roots.push( node );
+				continue;
+			}
+
+			parent.children.push( node );
+		}
+
+		return roots;
 	}
 
 	private assertUpdateIsNotEmpty( updateInput: object ): void
@@ -231,11 +551,15 @@ import {CategoryStatus} from './types/category-status.enum';
 
 	private toResponseDto( category: CategoryRecord ): CategoryResponseDto
 	{
-		const { _id, createdAt, updatedAt, archivedAt, ...categoryData } = category;
+		const { _id, parentId, ancestorIds, createdAt, updatedAt, archivedAt, ...categoryData } = category;
 
 		return {
 			id : _id.toHexString(),
 			...categoryData,
+			...( parentId && {
+				parentId : parentId.toHexString(),
+			} ),
+			ancestorIds : ancestorIds.map( ( ancestorId ) => ancestorId.toHexString() ),
 			createdAt : createdAt.toISOString(),
 			updatedAt : updatedAt.toISOString(),
 			...( archivedAt && {
