@@ -2,6 +2,8 @@
 @json = Content-Type: application/json
 @auth = Authorization: Bearer {{login.response.body.$.accessToken}}
 
+# Replace sample ids after creating resources in your local database.
+
 ###
 # =========================
 # HEALTH
@@ -25,23 +27,29 @@ GET {{baseUrl}}/health/db
 ###
 # Register
 # Public
+# Body fields:
+# - email: string, email format, max 254
+# - password: string, min 6, max 128
 POST {{baseUrl}}/auth/register
 {{json}}
 
 {
-  "email": "anthony@example.com",
-  "password": "password123"
+	"email": "buyer@example.com",
+	"password": "password123"
 }
 
 ###
 # @name login
 # Public
+# Body fields:
+# - email: string, email format, max 254
+# - password: string, min 6, max 128
 POST {{baseUrl}}/auth/login
 {{json}}
 
 {
-  "email": "admin1@example.com",
-  "password": "password123"
+	"email": "admin1@example.com",
+	"password": "password123"
 }
 
 ###
@@ -55,16 +63,22 @@ GET {{baseUrl}}/auth/me
 # USERS
 # =========================
 
+@userId = 6a00c5798a197fe534142f20
+
 ###
 # Get all users
 # Admin
+# Params:
+# - ?page=1&limit=20
+# - ?role=user | admin
+# - ?search=example@email.com
 GET {{baseUrl}}/users
 {{auth}}
 
 ###
 # Get one user
 # Admin
-GET {{baseUrl}}/users/69fc4f0c854dbf2bdd3f9295
+GET {{baseUrl}}/users/{{userId}}
 {{auth}}
 
 ###
@@ -76,176 +90,383 @@ GET {{baseUrl}}/users/me
 ###
 # Create user
 # Admin
+# Body fields:
+# - email: string, email format, max 254
+# - password: string, min 6, max 128
+# - role: user | admin, optional, defaults to user
 POST {{baseUrl}}/users
 {{auth}}
 {{json}}
 
 {
-  "email": "admin2@example.com",
-  "password": "password123",
-  "role": "admin"
+	"email": "admin2@example.com",
+	"password": "password123",
+	"role": "admin"
 }
 
 ###
 # Update me
 # User, Admin
+# Body fields:
+# - email: string, optional
+# - password: string, optional
+# - currentPassword: string, required when changing email or password
 PATCH {{baseUrl}}/users/me
 {{auth}}
 {{json}}
 
 {
-  "email": "admin1@example.com",
-  "currentPassword": "password123"
+	"email": "buyer.updated@example.com",
+	"password": "newPassword123",
+	"currentPassword": "password123"
 }
 
 ###
 # Update user
 # Admin
-PATCH {{baseUrl}}/users/6a00c5798a197fe534142f20
+# Body fields, all optional but at least one required:
+# - email: string
+# - password: string, min 6, max 128
+# - role: user | admin
+# - status: active | deleted
+PATCH {{baseUrl}}/users/{{userId}}
 {{auth}}
 {{json}}
 
 {
-  "email": "admin2@example.com",
-  "role": "admin",
-  "status": "active"
+	"email": "admin2.updated@example.com",
+	"password": "password123",
+	"role": "admin",
+	"status": "active"
 }
 
 ###
 # Soft delete user
 # Admin
-DELETE {{baseUrl}}/users/1
+DELETE {{baseUrl}}/users/{{userId}}
 {{auth}}
 
 ###
-# Remove self.
+# Remove self
 # User
 DELETE {{baseUrl}}/users/me
 {{auth}}
 
+###
 # =========================
-# Categories
+# CATEGORIES
 # =========================
+
+@categoryId = 6a05823ac121e211cbb9445c
+@parentCategoryId = 6a05823ac121e211cbb9445b
+@categorySlug = keyboards
 
 ###
 # List public categories
 # Public
-
 # Params:
-# 	?page=1&limit=20
-# 	?parentId=root
-# 	?parentId=<CATEGORY_ID>
-# 	?search=keyboard
+# - ?page=1&limit=20
+# - ?parentId=root
+# - ?parentId={{categoryId}}
+# - ?search=keyboard
+# - public listing returns active categories only
 GET {{baseUrl}}/categories
 
 ###
-# List all categories
+# List admin categories
 # Admin
-
 # Params:
-# 	?page=1&limit=20
-# 	?parentId=root
-# 	?parentId=<CATEGORY_ID>
-# 	?search=keyboard
-# 	?status=archived
+# - ?page=1&limit=20
+# - ?parentId=root
+# - ?parentId={{categoryId}}
+# - ?search=keyboard
+# - ?status=active | archived
 GET {{baseUrl}}/categories/admin
 {{auth}}
 
 ###
-# Get specific category
+# Get top-level active categories only
+# Public
+GET {{baseUrl}}/categories/root
+
+###
+# Get full active category tree
+# Public
+GET {{baseUrl}}/categories/tree
+
+###
+# Get category by id
 # Admin
-GET {{baseUrl}}/categories/admin/6a05823ac121e211cbb9445c
+GET {{baseUrl}}/categories/admin/{{categoryId}}
 {{auth}}
 
 ###
-# Get specific public category
+# Get category by id
 # Public
-GET {{baseUrl}}/categories/6a05823ac121e211cbb9445c
+GET {{baseUrl}}/categories/{{categoryId}}
 
 ###
-# Get specific public category by slug
+# Get category by slug
 # Public
-GET {{baseUrl}}/categories/slug/keyboards
+GET {{baseUrl}}/categories/slug/{{categorySlug}}
 
 ###
-# Add category
+# Get direct children of a category
+# Public
+GET {{baseUrl}}/categories/{{categoryId}}/children
+
+###
+# Get one category with its descendants as a subtree
+# Public
+GET {{baseUrl}}/categories/{{categoryId}}/tree
+
+###
+# Get inherited attribute definitions for a category
+# Public
+GET {{baseUrl}}/categories/{{categoryId}}/attributes
+
+###
+# Create root category
 # Admin
+# Body fields:
+# - name: string, required
+# - slug: string, optional; generated from name if omitted
+# - parentId: Mongo ObjectId string, optional
+# - description: string, optional
+# - status: active only on create; archived is rejected
+# - attributeDefinitions: array, optional
+# Attribute definition fields:
+# - key: string, required, lower_snake_case-like identifier
+# - label: string, required
+# - type: string | number | boolean | string_array
+# - required: boolean
+# - allowedValues: string[], optional; useful for string/string_array
+# - min: number, optional; useful for number
+# - max: number, optional; useful for number
+# - unit: string, optional; useful for number
+POST {{baseUrl}}/categories
+{{auth}}
+{{json}}
+
+{
+	"name": "RTV",
+	"slug": "rtv",
+	"description": "Electronics and home media products",
+	"status": "active",
+	"attributeDefinitions": [
+		{
+			"key": "brand",
+			"label": "Brand",
+			"type": "string",
+			"required": true,
+			"allowedValues": [
+				"Logitech",
+				"Samsung",
+				"Sony"
+			]
+		},
+		{
+			"key": "warranty_months",
+			"label": "Warranty months",
+			"type": "number",
+			"required": false,
+			"min": 0,
+			"max": 120,
+			"unit": "months"
+		},
+		{
+			"key": "wireless",
+			"label": "Wireless",
+			"type": "boolean",
+			"required": false
+		},
+		{
+			"key": "tags",
+			"label": "Tags",
+			"type": "string_array",
+			"required": false,
+			"allowedValues": [
+				"gaming",
+				"office",
+				"portable"
+			]
+		}
+	]
+}
+
+###
+# Create child category
+# Admin
+# Same body fields as create root category.
+# parentId makes this category inherit attributes from its ancestors.
 POST {{baseUrl}}/categories
 {{auth}}
 {{json}}
 
 {
 	"name": "Keyboards",
-	"description": "Mechanical and membrane keyboards"
+	"slug": "keyboards",
+	"parentId": "{{parentCategoryId}}",
+	"description": "Mechanical and membrane keyboards",
+	"status": "active",
+	"attributeDefinitions": [
+		{
+			"key": "layout",
+			"label": "Layout",
+			"type": "string",
+			"required": true,
+			"allowedValues": [
+				"full-size",
+				"TKL",
+				"60%"
+			]
+		},
+		{
+			"key": "switch_type",
+			"label": "Switch type",
+			"type": "string",
+			"required": false,
+			"allowedValues": [
+				"red",
+				"brown",
+				"blue"
+			]
+		}
+	]
 }
 
 ###
 # Update category
 # Admin
-PATCH {{baseUrl}}/categories/6a05823ac121e211cbb9445c
+# Body fields, all optional but at least one required:
+# - name: string
+# - slug: string
+# - description: string
+# - status: active | archived
+# - attributeDefinitions: array; replaces current local category definitions
+# parentId cannot be changed by this endpoint.
+PATCH {{baseUrl}}/categories/{{categoryId}}
 {{auth}}
 {{json}}
 
 {
 	"name": "Keyboards",
+	"slug": "keyboards",
+	"description": "Mechanical, membrane and wireless keyboards",
 	"status": "active",
-	"description": "Mechanical, membrane and broken keyboards"
+	"attributeDefinitions": [
+		{
+			"key": "layout",
+			"label": "Layout",
+			"type": "string",
+			"required": true,
+			"allowedValues": [
+				"full-size",
+				"TKL",
+				"60%"
+			]
+		},
+		{
+			"key": "switch_type",
+			"label": "Switch type",
+			"type": "string",
+			"required": false,
+			"allowedValues": [
+				"red",
+				"brown",
+				"blue"
+			]
+		}
+	]
 }
 
 ###
 # Archive category
 # Admin
-DELETE {{baseUrl}}/categories/6a05823ac121e211cbb9445c
+# Fails if category has child categories.
+DELETE {{baseUrl}}/categories/{{categoryId}}
 {{auth}}
 
 ###
 # =========================
-# Products
+# PRODUCTS
 # =========================
+
+@productId = 6a01a26067dc2520bb700e7a
+@productSlug = mechanical-keyboard-k87
+@productCategoryId = {{categoryId}}
 
 ###
 # Get public products
 # Public
+# Params:
+# - ?page=1&limit=20
+# - ?search=keyboard
+# - ?categoryId={{productCategoryId}}
+# - ?categoryId={{productCategoryId}}&includeSubcategories=true
+# - ?minPrice=10000&maxPrice=40000
+# - ?inStockOnly=true | false
+# - public listing returns active products only
 GET {{baseUrl}}/products
 
 ###
-# Get products of category
+# Get public products of category and its subcategories
 # Public
-GET {{baseUrl}}/products?categoryId=6a05823ac121e211cbb9445c
+GET {{baseUrl}}/products?categoryId={{productCategoryId}}&includeSubcategories=true
 
 ###
-# Get all products
+# Get admin products
 # Admin
+# Params:
+# - ?page=1&limit=20
+# - ?search=keyboard
+# - ?status=draft | active | archived
+# - ?categoryId={{productCategoryId}}
+# - ?categoryId={{productCategoryId}}&includeSubcategories=true
+# - ?minPrice=10000&maxPrice=40000
+# - ?inStockOnly=true | false
 GET {{baseUrl}}/products/admin
 {{auth}}
 
 ###
-# Get specific product
+# Get product by id
 # Admin
-GET {{baseUrl}}/products/admin/6a01a26067dc2520bb700e7a
+GET {{baseUrl}}/products/admin/{{productId}}
 {{auth}}
 
 ###
-# Get specific public product by slug
+# Get product by slug
 # Public
-GET {{baseUrl}}/products/slug/Mechanical Keyboard K87
+GET {{baseUrl}}/products/slug/{{productSlug}}
 
 ###
-# Get specific public product by id
+# Get product by id
 # Public
-GET {{baseUrl}}/products/6a01a26067dc2520bb700e7a
+GET {{baseUrl}}/products/{{productId}}
 
 ###
 # Create product
 # Admin
+# Body fields:
+# - name: string, required
+# - slug: string, optional; generated from name if omitted
+# - description: string, required
+# - categoryId: Mongo ObjectId string, required
+# - price.amount: number, required, minor units, e.g. 29999 = 299.99 PLN
+# - price.currency: PLN | EUR | USD
+# - stock: number, required
+# - images: array, optional; url, alt, isPrimary
+# - attributeValues: object, optional; keys must be inherited from category attributes
+# - status: draft | active; archived is rejected on create
 POST {{baseUrl}}/products
 {{auth}}
 {{json}}
 
 {
 	"name": "Mechanical Keyboard K87",
+	"slug": "mechanical-keyboard-k87",
 	"description": "Compact hot-swappable mechanical keyboard.",
-	"categoryId": "6a05823ac121e211cbb9445c",
+	"categoryId": "{{productCategoryId}}",
 	"price": {
 		"amount": 29999,
 		"currency": "PLN"
@@ -258,11 +479,16 @@ POST {{baseUrl}}/products
 			"isPrimary": true
 		}
 	],
-	"attributes": {
+	"attributeValues": {
+		"brand": "Logitech",
+		"warranty_months": 24,
+		"wireless": true,
+		"tags": [
+			"gaming",
+			"office"
+		],
 		"layout": "TKL",
-		"switchType": "brown",
-		"wireless": false,
-		"color": "black"
+		"switch_type": "brown"
 	},
 	"status": "active"
 }
@@ -270,24 +496,62 @@ POST {{baseUrl}}/products
 ###
 # Update product
 # Admin
-PATCH {{baseUrl}}/products/6a01a26067dc2520bb700e7a
+# Body fields, all optional but at least one required:
+# - name: string
+# - slug: string
+# - description: string
+# - categoryId: Mongo ObjectId string
+# - price: { amount, currency }
+# - stock: number
+# - images: array; replaces current images
+# - attributeValues: object; replaces current product attribute values
+# - status: draft | active | archived
+PATCH {{baseUrl}}/products/{{productId}}
 {{auth}}
 {{json}}
 
 {
-	"categoryId": "6a05823ac121e211cbb9445c",
+	"name": "Mechanical Keyboard K87 Updated",
+	"slug": "mechanical-keyboard-k87-updated",
+	"description": "Updated compact hot-swappable mechanical keyboard.",
+	"categoryId": "{{productCategoryId}}",
+	"price": {
+		"amount": 27999,
+		"currency": "PLN"
+	},
+	"stock": 20,
+	"images": [
+		{
+			"url": "https://i.ytimg.com/vi/ztyjepxO7mM/hqdefault.jpg",
+			"alt": "Keyboard front view",
+			"isPrimary": true
+		}
+	],
+	"attributeValues": {
+		"brand": "Logitech",
+		"warranty_months": 24,
+		"wireless": true,
+		"tags": [
+			"gaming"
+		],
+		"layout": "TKL",
+		"switch_type": "brown"
+	},
 	"status": "active"
 }
 
 ###
 # Archive product
 # Admin
-DELETE {{baseUrl}}/products/6a01a26067dc2520bb700e7a
+DELETE {{baseUrl}}/products/{{productId}}
 {{auth}}
 
+###
 # =========================
-# Carts
+# CART
 # =========================
+
+@cartProductId = {{productId}}
 
 ###
 # Get cart
@@ -298,19 +562,24 @@ GET {{baseUrl}}/cart
 ###
 # Add to cart
 # User
+# Body fields:
+# - productId: Mongo ObjectId string, required
+# - quantity: integer, min 1, max 100
 POST {{baseUrl}}/cart/items
 {{auth}}
 {{json}}
 
 {
-	"productId": "6a01a26067dc2520bb700e7a",
+	"productId": "{{cartProductId}}",
 	"quantity": 1
 }
 
 ###
-# Update cart item quantity
+# Update existing cart item quantity
 # User
-PATCH {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
+# Body fields:
+# - quantity: integer, min 1, max 100
+PATCH {{baseUrl}}/cart/items/{{cartProductId}}
 {{auth}}
 {{json}}
 
@@ -321,7 +590,7 @@ PATCH {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
 ###
 # Remove item from cart
 # User
-DELETE {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
+DELETE {{baseUrl}}/cart/items/{{cartProductId}}
 {{auth}}
 
 ###
@@ -330,22 +599,33 @@ DELETE {{baseUrl}}/cart/items/6a01a26067dc2520bb700e7a
 DELETE {{baseUrl}}/cart
 {{auth}}
 
+###
 # =========================
-# Orders
+# ORDERS
 # =========================
+
+@orderId = 6a020cb567353eff5191ea4b
 
 ###
 # Checkout
 # User
+# Body fields:
+# - shippingAddress.fullName: string, required
+# - shippingAddress.line1: string, required
+# - shippingAddress.line2: string, optional
+# - shippingAddress.city: string, required
+# - shippingAddress.postalCode: string, required
+# - shippingAddress.country: string, required
+# - shippingAddress.phone: string, optional
 POST {{baseUrl}}/orders/checkout
 {{auth}}
 {{json}}
 
 {
-	"shippingAddress": 
-	{
+	"shippingAddress": {
 		"fullName": "Jan Kowalski",
 		"line1": "Testowa 12",
+		"line2": "Apartment 4",
 		"city": "Warsaw",
 		"postalCode": "00-001",
 		"country": "Poland",
@@ -354,31 +634,36 @@ POST {{baseUrl}}/orders/checkout
 }
 
 ###
-# Get orders
+# Get my orders
 # User
 GET {{baseUrl}}/orders/my
 {{auth}}
 
 ###
-# Get order
+# Get my order by id
 # User
-GET {{baseUrl}}/orders/6a020cb567353eff5191ea4b
-{{auth}}
-
-# =========================
-# Payments
-# =========================
-
-###
-# Payment Success Mock
-# User, Admin
-POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-success
+GET {{baseUrl}}/orders/{{orderId}}
 {{auth}}
 
 ###
-# Payment Failure Mock
+# =========================
+# PAYMENTS
+# =========================
+
+@paymentId = 6a020cb567353eff5191ea4c
+
+###
+# Payment success mock
 # User, Admin
-POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-failure
+POST {{baseUrl}}/payments/{{paymentId}}/mock-success
+{{auth}}
+
+###
+# Payment failure mock
+# User, Admin
+# Body fields:
+# - reason: string, optional, max 300
+POST {{baseUrl}}/payments/{{paymentId}}/mock-failure
 {{auth}}
 {{json}}
 
@@ -386,19 +671,30 @@ POST {{baseUrl}}/payments/6a020cb567353eff5191ea4c/mock-failure
 	"reason": "Insufficient funds"
 }
 
+###
 # =========================
-# Reviews
+# REVIEWS
 # =========================
+
+@reviewProductId = {{productId}}
+@reviewId = 6a057117273e9d6f5d06df3e
+@adminReviewId = 6a0574464613c3f644e73dea
 
 ###
 # Get all reviews for a product
 # Public
-GET {{baseUrl}}/products/6a01a26067dc2520bb700e7a/reviews
+# Params:
+# - ?page=1&limit=20
+GET {{baseUrl}}/products/{{reviewProductId}}/reviews
 
 ###
 # Create review
 # User
-POST {{baseUrl}}/products/6a01a26067dc2520bb700e7a/reviews
+# Body fields:
+# - rating: integer, 1-5, required
+# - title: string, optional
+# - comment: string, optional
+POST {{baseUrl}}/products/{{reviewProductId}}/reviews
 {{auth}}
 {{json}}
 
@@ -411,24 +707,28 @@ POST {{baseUrl}}/products/6a01a26067dc2520bb700e7a/reviews
 ###
 # Update review
 # User
-PATCH {{baseUrl}}/reviews/6a057117273e9d6f5d06df3e
+# Body fields, all optional but at least one required:
+# - rating: integer, 1-5
+# - title: string
+# - comment: string
+PATCH {{baseUrl}}/reviews/{{reviewId}}
 {{auth}}
 {{json}}
 
 {
-	"rating": 2,
+	"rating": 4,
 	"title": "Changed my mind",
-	"comment": "Bad"
+	"comment": "Still good, but not perfect."
 }
 
 ###
-# Delete review
+# Delete own review
 # User
-DELETE {{baseUrl}}/reviews/6a057117273e9d6f5d06df3e
+DELETE {{baseUrl}}/reviews/{{reviewId}}
 {{auth}}
 
 ###
 # Delete review as admin
 # Admin
-DELETE {{baseUrl}}/reviews/admin/6a0574464613c3f644e73dea
+DELETE {{baseUrl}}/reviews/admin/{{adminReviewId}}
 {{auth}}
