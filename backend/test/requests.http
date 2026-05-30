@@ -34,7 +34,7 @@ POST {{baseUrl}}/auth/register
 {{json}}
 
 {
-	"email": "buyer@example.com",
+	"email": "user1@example.com",
 	"password": "password123"
 }
 
@@ -48,7 +48,7 @@ POST {{baseUrl}}/auth/login
 {{json}}
 
 {
-	"email": "admin1@example.com",
+	"email": "admin@example.com",
 	"password": "password123"
 }
 
@@ -63,7 +63,7 @@ GET {{baseUrl}}/auth/me
 # USERS
 # =========================
 
-@userId = 6a00c5798a197fe534142f20
+@userId = 6a19ea4e358236d040e28b32
 
 ###
 # Get all users
@@ -99,9 +99,9 @@ POST {{baseUrl}}/users
 {{json}}
 
 {
-	"email": "admin2@example.com",
+	"email": "user2@example.com",
 	"password": "password123",
-	"role": "admin"
+	"role": "user"
 }
 
 ###
@@ -116,7 +116,7 @@ PATCH {{baseUrl}}/users/me
 {{json}}
 
 {
-	"email": "buyer.updated@example.com",
+	"email": "user.updated@example.com",
 	"password": "newPassword123",
 	"currentPassword": "password123"
 }
@@ -134,7 +134,7 @@ PATCH {{baseUrl}}/users/{{userId}}
 {{json}}
 
 {
-	"email": "admin2.updated@example.com",
+	"email": "admin.updated@example.com",
 	"password": "password123",
 	"role": "admin",
 	"status": "active"
@@ -732,3 +732,10 @@ DELETE {{baseUrl}}/reviews/{{reviewId}}
 # Admin
 DELETE {{baseUrl}}/reviews/admin/{{adminReviewId}}
 {{auth}}
+
+# TODO: 
+# Make sure every service returns a Mongo validation error.
+# standardize OmitUndefined.
+# Run tests. 
+# Add more stuff to checkout.
+# Final cleanup.

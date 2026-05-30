@@ -16,6 +16,8 @@ import {
 
 import {CollectionValidatorDefinition} from './collection-validator-definition';
 
+const NUMERIC_BSON_TYPES = [ 'int', 'long', 'double', 'decimal' ];
+
 export const categoryValidator: CollectionValidatorDefinition = {
 	collectionName : 'categories',
 	validator : {
@@ -54,18 +56,6 @@ export const categoryValidator: CollectionValidatorDefinition = {
 					enum : [ 'active', 'archived' ],
 					description : 'status must be active or archived',
 				},
-				createdAt : {
-					bsonType : 'date',
-					description : 'createdAt must be a date and is required',
-				},
-				updatedAt : {
-					bsonType : 'date',
-					description : 'updatedAt must be a date and is required',
-				},
-				archivedAt : {
-					bsonType : 'date',
-					description : 'archivedAt must be a date when present',
-				},
 				parentId : {
 					bsonType : 'objectId',
 					description : 'parentId must be an ObjectId when present',
@@ -78,7 +68,7 @@ export const categoryValidator: CollectionValidatorDefinition = {
 					},
 				},
 				level : {
-					bsonType : 'number',
+					bsonType : NUMERIC_BSON_TYPES,
 					minimum : 0,
 					maximum : CATEGORY_MAX_DEPTH,
 					description : 'level must be a non-negative category depth',
@@ -125,18 +115,18 @@ export const categoryValidator: CollectionValidatorDefinition = {
 							allowedValues : {
 								bsonType : 'array',
 								maxItems : CATEGORY_ATTRIBUTE_ALLOWED_VALUES_MAX_COUNT,
+								description : 'allowedValues must be an array of strings when present',
 								items : {
 									bsonType : 'string',
 									maxLength : CATEGORY_ATTRIBUTE_ALLOWED_VALUE_MAX_LENGTH,
 								},
-								description : 'allowedValues must be an array of strings when present',
 							},
 							min : {
-								bsonType : 'number',
+								bsonType : NUMERIC_BSON_TYPES,
 								description : 'min must be a number when present',
 							},
 							max : {
-								bsonType : 'number',
+								bsonType : NUMERIC_BSON_TYPES,
 								description : 'max must be a number when present',
 							},
 							unit : {
@@ -146,6 +136,18 @@ export const categoryValidator: CollectionValidatorDefinition = {
 							},
 						},
 					},
+				},
+				createdAt : {
+					bsonType : 'date',
+					description : 'createdAt must be a date and is required',
+				},
+				updatedAt : {
+					bsonType : 'date',
+					description : 'updatedAt must be a date and is required',
+				},
+				archivedAt : {
+					bsonType : 'date',
+					description : 'archivedAt must be a date when present',
 				},
 			},
 		},

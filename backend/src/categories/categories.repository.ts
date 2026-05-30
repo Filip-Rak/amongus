@@ -60,10 +60,14 @@ export interface FindCategoriesResult {
 		const document: CategoryDocument = {
 			name : input.name,
 			slug : input.slug,
-			parentId : input.parentId,
+			...( input.parentId && {
+				parentId : input.parentId,
+			} ),
 			ancestorIds : input.ancestorIds,
 			level : input.level,
-			description : input.description,
+			...( input.description && {
+				description : input.description,
+			} ),
 			status : input.status,
 			attributeDefinitions : input.attributeDefinitions,
 			createdAt : now,

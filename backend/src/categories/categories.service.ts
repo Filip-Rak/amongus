@@ -1,31 +1,20 @@
-import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {isMongoDocumentValidationError, isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
 import {CATEGORY_MAX_DEPTH} from '@/common/validation/validation-limits';
-import {
-	BadRequestException,
-	ConflictException,
-	Injectable,
-	NotFoundException,
-} from '@nestjs/common';
+import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
+import {getMongoValidationMessages} from 'common/mongo/mongo-validation-error';
 import {ObjectId} from 'mongodb';
 
-import {
-	CategoriesRepository,
-	CreateCategoryInput,
-	UpdateCategoryInput,
-} from './categories.repository';
+import {CategoriesRepository, CreateCategoryInput, UpdateCategoryInput} from './categories.repository';
 import {
 	CategoryInheritedAttributesResponseDto,
 	CategoryResponseDto,
 	CategoryTreeResponseDto,
-	PaginatedCategoriesResponseDto,
+	PaginatedCategoriesResponseDto
 } from './dto/category-response.dto';
 import {CreateCategoryDto} from './dto/create-category.dto';
 import {ListCategoriesQueryDto} from './dto/list-categories-query.dto';
 import {UpdateCategoryDto} from './dto/update-category.dto';
-import {
-	CategoryAttributeDefinition,
-	CategoryRecord,
-} from './types/category-document.type';
+import {CategoryAttributeDefinition, CategoryRecord} from './types/category-document.type';
 import {CategoryStatus} from './types/category-status.enum';
 
 @Injectable() export class CategoriesService
@@ -41,7 +30,7 @@ import {CategoryStatus} from './types/category-status.enum';
 
 		const input = await this.buildCreateInput( dto );
 
-		return this.withDuplicateSlugHandling( async () => {
+		return this.withCategoryWriteErrorHandling( async () => {
 			const category = await this.categoriesRepository.create( input );
 
 			return this.toResponseDto( category );
@@ -201,7 +190,7 @@ import {CategoryStatus} from './types/category-status.enum';
 
 		this.assertUpdateIsNotEmpty( updateInput );
 
-		return this.withDuplicateSlugHandling( async () => {
+		return this.withCategoryWriteErrorHandling( async () => {
 			const updatedCategory = await this.categoriesRepository.updateById(
 			    id,
 			    updateInput,
@@ -530,7 +519,7 @@ import {CategoryStatus} from './types/category-status.enum';
 		return slug;
 	}
 
-	private async withDuplicateSlugHandling< T >(
+	private async withCategoryWriteErrorHandling< T >(
 	    operation: () => Promise< T >,
 	    ): Promise< T >
 	{
@@ -543,6 +532,14 @@ import {CategoryStatus} from './types/category-status.enum';
 			if ( isMongoDuplicateKeyError( error ) )
 			{
 				throw new ConflictException( 'Category slug is already in use' );
+			}
+
+			if ( isMongoDocumentValidationError( error ) )
+			{
+				throw new BadRequestException( {
+					message : 'Category failed database validation',
+					validationErrors : getMongoValidationMessages( error ),
+				} );
 			}
 
 			throw error;
