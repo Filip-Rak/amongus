@@ -1,0 +1,295 @@
+% sections/02-common-conventions.tex
+
+\section{Common API Conventions}
+
+\subsection{Base URL}
+
+During local development, the backend is available at:
+
+\begin{minted}{text}
+http://localhost:3000
+\end{minted}
+
+All endpoint paths in this document are written relative to this base URL.
+
+For example:
+
+\begin{minted}{http}
+GET /products
+\end{minted}
+
+means:
+
+\begin{minted}{text}
+http://localhost:3000/products
+\end{minted}
+
+\subsection{Content Type}
+
+All request bodies should be sent as JSON.
+
+\begin{minted}{http}
+Content-Type: application/json
+\end{minted}
+
+Unless stated otherwise, endpoints that accept a request body expect JSON.
+
+\subsection{Authentication}
+
+Authenticated endpoints require a Bearer token:
+
+\begin{minted}{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+The API uses three practical access levels:
+
+\begin{itemize}
+    \item \textbf{Public} --- no token required,
+    \item \textbf{User} --- authenticated regular user,
+    \item \textbf{Admin} --- authenticated administrator.
+\end{itemize}
+
+Some endpoints are available to both users and administrators, but apply ownership rules. For example, a regular user can access only their own cart, orders, payments, and reviews, while an administrator may have broader access for selected operations.
+
+\subsection{Identifiers}
+
+All persistent entity identifiers are MongoDB ObjectId strings.
+
+Example:
+
+\begin{minted}{text}
+665000000000000000000001
+\end{minted}
+
+Path parameters named \texttt{id}, \texttt{productId}, \texttt{categoryId}, \texttt{orderId}, \texttt{paymentId}, or \texttt{reviewId} should be valid ObjectId strings.
+
+Invalid ObjectId values are rejected before reaching the database layer.
+
+\subsection{Pagination}
+
+Paginated endpoints use the following query parameters:
+
+\begin{itemize}
+    \item \texttt{page} --- optional positive integer, default: \texttt{1},
+    \item \texttt{limit} --- optional positive integer, default: \texttt{20}, maximum: \texttt{100}.
+\end{itemize}
+
+Example:
+
+\begin{minted}{http}
+GET /products?page=1&limit=20
+\end{minted}
+
+Paginated responses use the following general shape:
+
+\begin{minted}[frame=single]{json}
+{
+"items": [],
+"page": 1,
+"limit": 20,
+"total": 0,
+"totalPages": 0
+}
+\end{minted}
+
+\subsection{Money Representation}
+
+Prices and monetary amounts are represented as integer-like numeric values in minor currency units.
+
+For example:
+
+\begin{minted}[frame=single]{json}
+{
+"amount": 29999,
+"currency": "PLN"
+}
+\end{minted}
+
+means:
+
+\begin{minted}{text}
+299.99 PLN
+\end{minted}
+
+The currently supported currencies are:
+
+\begin{itemize}
+    \item \texttt{PLN},
+    \item \texttt{EUR},
+    \item \texttt{USD}.
+\end{itemize}
+
+\subsection{Common Status and Type Values}
+
+\subsubsection{User roles}
+
+\begin{itemize}
+    \item \texttt{user},
+    \item \texttt{admin}.
+\end{itemize}
+
+\subsubsection{User statuses}
+
+\begin{itemize}
+    \item \texttt{active},
+    \item \texttt{deleted}.
+\end{itemize}
+
+\subsubsection{Category statuses}
+
+\begin{itemize}
+    \item \texttt{active},
+    \item \texttt{archived}.
+\end{itemize}
+
+\subsubsection{Product statuses}
+
+\begin{itemize}
+    \item \texttt{draft},
+    \item \texttt{active},
+    \item \texttt{archived}.
+\end{itemize}
+
+\subsubsection{Category attribute types}
+
+\begin{itemize}
+    \item \texttt{string},
+    \item \texttt{number},
+    \item \texttt{boolean},
+    \item \texttt{string\_array}.
+\end{itemize}
+
+These types are used by category attribute definitions and determine how the frontend should render product attribute input fields.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|l|}
+        \hline
+        \textbf{Attribute type}                               & \textbf{Suggested frontend input} \\
+        \hline
+        \texttt{string} with \texttt{allowedValues}           & select/dropdown                   \\
+        \texttt{string} without \texttt{allowedValues}        & text input                        \\
+        \texttt{number}                                       & number input                      \\
+        \texttt{boolean}                                      & checkbox/toggle                   \\
+        \texttt{string\_array} with \texttt{allowedValues}    & multi-select                      \\
+        \texttt{string\_array} without \texttt{allowedValues} & tag input                         \\
+        \hline
+    \end{tabular}
+    \caption{Frontend interpretation of category attribute types}
+\end{table}
+
+\subsubsection{Order statuses}
+
+\begin{itemize}
+    \item \texttt{pending\_payment},
+    \item \texttt{paid},
+    \item \texttt{payment\_failed},
+    \item \texttt{cancelled},
+    \item \texttt{shipped},
+    \item \texttt{completed}.
+\end{itemize}
+
+\subsubsection{Payment statuses}
+
+\begin{itemize}
+    \item \texttt{pending},
+    \item \texttt{paid},
+    \item \texttt{failed}.
+\end{itemize}
+
+\subsubsection{Review statuses}
+
+\begin{itemize}
+    \item \texttt{active},
+    \item \texttt{deleted}.
+\end{itemize}
+
+\subsection{Common Error Response}
+
+Validation and business rule errors usually return a JSON response with a message, HTTP error name, and status code.
+
+Example:
+
+\begin{minted}[frame=single]{json}
+{
+"message": "Product not found",
+"error": "Not Found",
+"statusCode": 404
+}
+\end{minted}
+
+For DTO validation errors, the \texttt{message} field may be an array:
+
+\begin{minted}[frame=single]{json}
+{
+"message": [
+"email must be an email",
+"password must be longer than or equal to 6 characters"
+],
+"error": "Bad Request",
+"statusCode": 400
+}
+\end{minted}
+
+\subsection{Database Validation Errors}
+
+Some write operations may fail MongoDB schema validation. In that case, the API returns a response with additional \texttt{validationErrors} details.
+
+Example:
+
+\begin{minted}[frame=single]{json}
+{
+"message": "Category failed database validation",
+"validationErrors": [
+"attributeDefinitions failed validation"
+],
+"error": "Bad Request",
+"statusCode": 400
+}
+\end{minted}
+
+These errors usually indicate a mismatch between the service layer and the MongoDB collection validator. They are useful during development because they show which database-level rule rejected the document.
+
+\subsection{Soft Deletion and Archiving}
+
+The API generally avoids hard deletion for business entities.
+
+\begin{itemize}
+    \item Users are soft-deleted by changing their status to \texttt{deleted}.
+    \item Reviews are soft-deleted by changing their status to \texttt{deleted}.
+    \item Products and categories are archived by changing their status to \texttt{archived}.
+\end{itemize}
+
+Public endpoints usually return only active records. Admin endpoints may expose inactive or archived records where needed.
+
+\subsection{Timestamps}
+
+Date-time fields are returned as ISO strings.
+
+Common timestamp fields include:
+
+\begin{itemize}
+    \item \texttt{createdAt},
+    \item \texttt{updatedAt},
+    \item \texttt{deletedAt},
+    \item \texttt{archivedAt},
+    \item \texttt{paidAt},
+    \item \texttt{failedAt},
+    \item \texttt{cancelledAt}.
+\end{itemize}
+
+Optional timestamp fields are returned only when relevant.
+
+\subsection{Endpoint Documentation Format}
+
+Each endpoint is described using the following structure:
+
+\begin{itemize}
+    \item \textbf{Access} --- public, authenticated user, administrator, or mixed ownership-based access.
+    \item \textbf{Description} --- what the endpoint does.
+    \item \textbf{Query parameters} --- optional URL parameters, if supported.
+    \item \textbf{Path parameters} --- required route parameters.
+    \item \textbf{Request body} --- JSON body accepted by POST and PATCH endpoints.
+    \item \textbf{Important rules} --- business rules or validation rules worth knowing.
+\end{itemize}
