@@ -1,11 +1,4 @@
 import {
-	CATEGORY_ATTRIBUTE_ALLOWED_VALUE_MAX_LENGTH,
-	CATEGORY_ATTRIBUTE_ALLOWED_VALUES_MAX_COUNT,
-	CATEGORY_ATTRIBUTE_KEY_MAX_LENGTH,
-	CATEGORY_ATTRIBUTE_KEY_MIN_LENGTH,
-	CATEGORY_ATTRIBUTE_LABEL_MAX_LENGTH,
-	CATEGORY_ATTRIBUTE_LABEL_MIN_LENGTH,
-	CATEGORY_ATTRIBUTE_UNIT_MAX_LENGTH,
 	CATEGORY_ATTRIBUTES_MAX_COUNT,
 	CATEGORY_DESCRIPTION_MAX_LENGTH,
 	CATEGORY_MAX_DEPTH,
@@ -88,25 +81,15 @@ export const categoryValidator: CollectionValidatorDefinition = {
 						properties : {
 							key : {
 								bsonType : 'string',
-								minLength : CATEGORY_ATTRIBUTE_KEY_MIN_LENGTH,
-								maxLength : CATEGORY_ATTRIBUTE_KEY_MAX_LENGTH,
-								pattern : '^[a-z][a-z0-9_]*$',
-								description : 'attribute key must be a valid identifier',
+								description : 'attribute key must be a string',
 							},
 							label : {
 								bsonType : 'string',
-								minLength : CATEGORY_ATTRIBUTE_LABEL_MIN_LENGTH,
-								maxLength : CATEGORY_ATTRIBUTE_LABEL_MAX_LENGTH,
-								description : 'attribute label must be a non-empty string',
+								description : 'attribute label must be a string',
 							},
 							type : {
-								enum : [
-									'string',
-									'number',
-									'boolean',
-									'string_array',
-								],
-								description : 'attribute type must be supported',
+								bsonType : 'string',
+								description : 'attribute type must be a string',
 							},
 							isRequired : {
 								bsonType : 'bool',
@@ -114,12 +97,7 @@ export const categoryValidator: CollectionValidatorDefinition = {
 							},
 							allowedValues : {
 								bsonType : 'array',
-								maxItems : CATEGORY_ATTRIBUTE_ALLOWED_VALUES_MAX_COUNT,
-								description : 'allowedValues must be an array of strings when present',
-								items : {
-									bsonType : 'string',
-									maxLength : CATEGORY_ATTRIBUTE_ALLOWED_VALUE_MAX_LENGTH,
-								},
+								description : 'allowedValues must be an array when present',
 							},
 							min : {
 								bsonType : NUMERIC_BSON_TYPES,
@@ -131,7 +109,6 @@ export const categoryValidator: CollectionValidatorDefinition = {
 							},
 							unit : {
 								bsonType : 'string',
-								maxLength : CATEGORY_ATTRIBUTE_UNIT_MAX_LENGTH,
 								description : 'unit must be a string when present',
 							},
 						},

@@ -47,7 +47,7 @@ export class UpdateProductDto
 	slug?: string;
 
 	@IsOptional()
-	@Transform( trimLowercaseString )
+	@Transform( trimString )
 	@IsString()
 	@MinLength( TEXT_MIN_LENGTH )
 	@MaxLength( PRODUCT_DESCRIPTION_MAX_LENGTH )
