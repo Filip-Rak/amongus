@@ -1,5 +1,5 @@
-import {CategoryAttributeDefinition} from '../types/category-document.type';
-import {CategoryStatus} from '../types/category-status.enum';
+import {CategoryAttributeDefinition} from '@/categories/types/category-document.type';
+import {CategoryStatus} from '@/categories/types/category-status.enum';
 
 export interface CategoryResponseDto {
 	id: string;

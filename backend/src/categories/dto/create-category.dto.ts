@@ -1,3 +1,4 @@
+import {CategoryStatus} from '@/categories/types/category-status.enum';
 import {
 	trimLowercaseString,
 	trimString,
@@ -22,8 +23,6 @@ import {
 	MinLength,
 	ValidateNested,
 } from 'class-validator';
-
-import {CategoryStatus} from '../types/category-status.enum';
 
 import {CategoryAttributeDefinitionDto} from './category-attribute-definition.dto';
 

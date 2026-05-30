@@ -1,3 +1,4 @@
+import {CategoryStatus} from '@/categories/types/category-status.enum';
 import {trimLowercaseString, trimString} from '@/common/transformers/string.transformers';
 import {
 	CATEGORY_ATTRIBUTES_MAX_COUNT,
@@ -18,8 +19,6 @@ import {
 	MinLength,
 	ValidateNested
 } from 'class-validator';
-
-import {CategoryStatus} from '../types/category-status.enum';
 
 import {CategoryAttributeDefinitionDto} from './category-attribute-definition.dto';
 

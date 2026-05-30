@@ -1,3 +1,4 @@
+import {CategoryAttributeType} from '@/categories/types/category-attribute-type.enum';
 import {trimLowercaseString, trimString} from '@/common/transformers/string.transformers';
 import {
 	CATEGORY_ATTRIBUTE_ALLOWED_VALUE_MAX_LENGTH,
@@ -21,8 +22,6 @@ import {
 	MaxLength,
 	MinLength
 } from 'class-validator';
-
-import {CategoryAttributeType} from '../types/category-attribute-type.enum';
 
 export class CategoryAttributeDefinitionDto
 {

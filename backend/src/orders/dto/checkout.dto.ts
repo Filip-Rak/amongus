@@ -11,6 +11,7 @@ import {
 	COMPANY_TAX_ID_MAX_LENGTH,
 	TEXT_MIN_LENGTH
 } from '@/common/validation/validation-limits';
+import {PurchaseType} from '@/orders/types/purchase-type.enum';
 import {Transform, Type} from 'class-transformer';
 import {
 	IsBoolean,
@@ -22,8 +23,6 @@ import {
 	MinLength,
 	ValidateNested
 } from 'class-validator';
-
-import {PurchaseType} from '../types/purchase-type.enum';
 
 export class CheckoutAddressDto
 {
