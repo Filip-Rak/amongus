@@ -1,0 +1,422 @@
+\section{Cart Endpoints}
+
+Cart endpoints allow an authenticated regular user to view and manage their shopping cart.
+
+The cart is user-specific. Each regular user has at most one cart. Cart endpoints are available only to users with the \texttt{user} role.
+
+\subsection{Cart Response Shape}
+
+Cart endpoints return the following response shape:
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000020",
+    "userId": "665000000000000000000001",
+    "items": [
+        {
+            "productId": "665000000000000000000010",
+            "quantity": 2,
+            "addedAt": "2026-05-30T10:00:00.000Z",
+            "updatedAt": "2026-05-30T10:05:00.000Z",
+            "isAvailable": true,
+            "lineTotalAmount": 49998,
+            "product": {
+                "id": "665000000000000000000010",
+                "name": "Smart Toaster 3000",
+                "slug": "smart-toaster-3000",
+                "price": {
+                    "amount": 24999,
+                    "currency": "PLN"
+                },
+                "stock": 10,
+                "imageUrl": "https://example.com/toaster.jpg"
+            }
+        }
+    ],
+    "totalQuantity": 2,
+    "totals": [
+        {
+            "currency": "PLN",
+            "amount": 49998
+        }
+    ],
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+\pagebreak
+If the user does not have a cart yet, the response uses an empty cart shape:
+
+\begin{minted}[frame=single]{json}
+{
+    "id": null,
+    "userId": "665000000000000000000001",
+    "items": [],
+    "totalQuantity": 0,
+    "totals": [],
+    "createdAt": null,
+    "updatedAt": null
+}
+\end{minted}
+
+\subsection{Cart Item Response Shape}
+
+Each cart item contains cart-specific fields and a product summary.
+
+\begin{minted}[frame=single]{json}
+{
+    "productId": "665000000000000000000010",
+    "quantity": 2,
+    "addedAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:05:00.000Z",
+    "isAvailable": true,
+    "lineTotalAmount": 49998,
+    "product": {
+        "id": "665000000000000000000010",
+        "name": "Smart Toaster 3000",
+        "slug": "smart-toaster-3000",
+        "price": {
+            "amount": 24999,
+            "currency": "PLN"
+        },
+        "stock": 10,
+        "imageUrl": "https://example.com/toaster.jpg"
+    }
+}
+\end{minted}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item \texttt{lineTotalAmount} is calculated as product price amount multiplied by item quantity.
+    \item If the product is no longer active or available, \texttt{isAvailable} is \texttt{false}.
+    \item Unavailable items have \texttt{lineTotalAmount} set to \texttt{null}.
+    \item Unavailable items have \texttt{product} set to \texttt{null}.
+    \item Cart totals include only currently available active products.
+\end{itemize}
+
+\pagebreak
+\subsection{\texttt{GET /cart}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Returns the current user's cart.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The endpoint returns the cart belonging to the authenticated user.
+    \item If the user does not have a cart yet, an empty cart response is returned.
+    \item Product data in the response reflects current active product data.
+    \item Products that are no longer active are represented as unavailable cart items.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /cart
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000020",
+    "userId": "665000000000000000000001",
+    "items": [
+        {
+            "productId": "665000000000000000000010",
+            "quantity": 2,
+            "addedAt": "2026-05-30T10:00:00.000Z",
+            "updatedAt": "2026-05-30T10:05:00.000Z",
+            "isAvailable": true,
+            "lineTotalAmount": 49998,
+            "product": {
+                "id": "665000000000000000000010",
+                "name": "Smart Toaster 3000",
+                "slug": "smart-toaster-3000",
+                "price": {
+                    "amount": 24999,
+                    "currency": "PLN"
+                },
+                "stock": 10,
+                "imageUrl": "https://example.com/toaster.jpg"
+            }
+        }
+    ],
+    "totalQuantity": 2,
+    "totals": [
+        {
+            "currency": "PLN",
+            "amount": 49998
+        }
+    ],
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{POST /cart/items}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Adds a product to the current user's cart. If the product is already in the cart, the requested quantity is added to the existing quantity.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "productId": "665000000000000000000010",
+    "quantity": 2
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{productId} --- required product ObjectId.
+    \item \texttt{quantity} --- required integer within the allowed cart item quantity range.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The product must exist and be active.
+    \item The product must be in stock.
+    \item The final cart quantity cannot exceed current product stock.
+    \item If the item already exists in the cart, this endpoint increments its quantity.
+    \item If the user does not have a cart yet, the cart is created automatically.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+POST /cart/items
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "productId": "665000000000000000000010",
+    "quantity": 2
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000020",
+    "userId": "665000000000000000000001",
+    "items": [
+        {
+            "productId": "665000000000000000000010",
+            "quantity": 2,
+            "addedAt": "2026-05-30T10:00:00.000Z",
+            "updatedAt": "2026-05-30T10:00:00.000Z",
+            "isAvailable": true,
+            "lineTotalAmount": 49998,
+            "product": {
+                "id": "665000000000000000000010",
+                "name": "Smart Toaster 3000",
+                "slug": "smart-toaster-3000",
+                "price": {
+                    "amount": 24999,
+                    "currency": "PLN"
+                },
+                "stock": 10
+            }
+        }
+    ],
+    "totalQuantity": 2,
+    "totals": [
+        {
+            "currency": "PLN",
+            "amount": 49998
+        }
+    ],
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{PATCH /cart/items/:productId}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Sets the final quantity for a product in the current user's cart.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{productId} --- product ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "quantity": 4
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{quantity} --- required integer within the allowed cart item quantity range.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The product must exist and be active.
+    \item The product must be in stock.
+    \item The requested quantity cannot exceed current product stock.
+    \item This endpoint sets the final quantity instead of incrementing it.
+    \item With the current implementation, if the item is not already in the cart, it is added with the requested quantity.
+    \item If the user does not have a cart yet, the cart is created automatically.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+PATCH /cart/items/665000000000000000000010
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "quantity": 4
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000020",
+    "userId": "665000000000000000000001",
+    "items": [
+        {
+            "productId": "665000000000000000000010",
+            "quantity": 4,
+            "addedAt": "2026-05-30T10:00:00.000Z",
+            "updatedAt": "2026-05-30T10:10:00.000Z",
+            "isAvailable": true,
+            "lineTotalAmount": 99996,
+            "product": {
+                "id": "665000000000000000000010",
+                "name": "Smart Toaster 3000",
+                "slug": "smart-toaster-3000",
+                "price": {
+                    "amount": 24999,
+                    "currency": "PLN"
+                },
+                "stock": 10
+            }
+        }
+    ],
+    "totalQuantity": 4,
+    "totals": [
+        {
+            "currency": "PLN",
+            "amount": 99996
+        }
+    ],
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:10:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{DELETE /cart/items/:productId}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Removes a product from the current user's cart.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{productId} --- product ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The item is removed from the authenticated user's cart.
+    \item Removing a missing item is treated as a successful no-op.
+    \item Successful removal returns \texttt{204 No Content}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+DELETE /cart/items/665000000000000000000010
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\subsection{\texttt{DELETE /cart}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Clears all items from the current user's cart.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The cart document is kept, but its item list is cleared.
+    \item Clearing an already empty or missing cart is treated as a successful no-op.
+    \item Successful clearing returns \texttt{204 No Content}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+DELETE /cart
+Authorization: Bearer <accessToken>
+\end{minted}
