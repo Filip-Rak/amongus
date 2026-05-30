@@ -1,0 +1,421 @@
+\section{Order Endpoints}
+
+Order endpoints allow authenticated regular users to create orders from their cart and view their own orders.
+
+The current API exposes only user-owned order operations. There are no administrator order management endpoints in the current version.
+
+\subsection{Order Response Shape}
+
+Most order endpoints return the following order shape:
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000030",
+    "userId": "665000000000000000000001",
+    "status": "pending_payment",
+    "items": [
+        {
+            "productId": "665000000000000000000010",
+            "productName": "Smart Toaster 3000",
+            "productSlug": "smart-toaster-3000",
+            "unitPriceAmount": 24999,
+            "currency": "PLN",
+            "quantity": 2,
+            "imageUrl": "https://example.com/toaster.jpg"
+        }
+    ],
+    "shippingAddress": {
+        "fullName": "Jan Kowalski",
+        "line1": "Example Street 12",
+        "line2": "Apartment 4",
+        "city": "Warsaw",
+        "postalCode": "00-001",
+        "country": "Poland",
+        "phone": "+48123456789"
+    },
+    "totals": {
+        "subtotalAmount": 49998,
+        "shippingAmount": 0,
+        "totalAmount": 49998,
+        "currency": "PLN"
+    },
+    "paymentId": "665000000000000000000040",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\pagebreak
+Paid orders may also include:
+
+\begin{minted}[frame=single]{json}
+{
+    "paidAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+Cancelled orders may also include:
+
+\begin{minted}[frame=single]{json}
+{
+    "cancelledAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+\subsection{Order Item Snapshot}
+
+Order items are stored as product snapshots. This means the order keeps selected product data from the time of checkout.
+
+\begin{minted}[frame=single]{json}
+{
+    "productId": "665000000000000000000010",
+    "productName": "Smart Toaster 3000",
+    "productSlug": "smart-toaster-3000",
+    "unitPriceAmount": 24999,
+    "currency": "PLN",
+    "quantity": 2,
+    "imageUrl": "https://example.com/toaster.jpg"
+}
+\end{minted}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item \texttt{productId} points to the product.
+    \item \texttt{productName}, \texttt{productSlug}, \texttt{unitPriceAmount}, \texttt{currency}, and \texttt{imageUrl} are copied into the order during checkout.
+    \item Later product edits do not rewrite historical order item data.
+\end{itemize}
+
+\subsection{Shipping Address Shape}
+
+Checkout requires a shipping address.
+
+\begin{minted}[frame=single]{json}
+{
+    "fullName": "Jan Kowalski",
+    "line1": "Example Street 12",
+    "line2": "Apartment 4",
+    "city": "Warsaw",
+    "postalCode": "00-001",
+    "country": "Poland",
+    "phone": "+48123456789"
+}
+\end{minted}
+
+\textbf{Shipping address fields:}
+
+\begin{itemize}
+    \item \texttt{fullName} --- required string.
+    \item \texttt{line1} --- required string.
+    \item \texttt{line2} --- optional string.
+    \item \texttt{city} --- required string.
+    \item \texttt{postalCode} --- required string.
+    \item \texttt{country} --- required string.
+    \item \texttt{phone} --- optional string.
+\end{itemize}
+
+\subsection{Order Totals Shape}
+
+\begin{minted}[frame=single]{json}
+{
+    "subtotalAmount": 49998,
+    "shippingAmount": 0,
+    "totalAmount": 49998,
+    "currency": "PLN"
+}
+\end{minted}
+
+\textbf{Total fields:}
+
+\begin{itemize}
+    \item \texttt{subtotalAmount} --- sum of item prices before shipping.
+    \item \texttt{shippingAmount} --- shipping cost.
+    \item \texttt{totalAmount} --- final amount to be paid.
+    \item \texttt{currency} --- order currency.
+\end{itemize}
+
+The current checkout implementation uses \texttt{0} as the shipping amount.
+
+\subsection{Order Status Values}
+
+Orders may use the following status values:
+
+\begin{itemize}
+    \item \texttt{pending\_payment},
+    \item \texttt{paid},
+    \item \texttt{payment\_failed},
+    \item \texttt{cancelled},
+    \item \texttt{shipped},
+    \item \texttt{completed}.
+\end{itemize}
+
+\subsection{\texttt{POST /orders/checkout}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Creates an order from the current user's cart and creates a pending mock payment for that order.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "shippingAddress": {
+        "fullName": "Jan Kowalski",
+        "line1": "Example Street 12",
+        "line2": "Apartment 4",
+        "city": "Warsaw",
+        "postalCode": "00-001",
+        "country": "Poland",
+        "phone": "+48123456789"
+    }
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{shippingAddress} --- required object containing the shipping address.
+    \item \texttt{shippingAddress.fullName} --- required string.
+    \item \texttt{shippingAddress.line1} --- required string.
+    \item \texttt{shippingAddress.line2} --- optional string.
+    \item \texttt{shippingAddress.city} --- required string.
+    \item \texttt{shippingAddress.postalCode} --- required string.
+    \item \texttt{shippingAddress.country} --- required string.
+    \item \texttt{shippingAddress.phone} --- optional string.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The user must have a non-empty cart.
+    \item Every cart product must still exist and be active.
+    \item Every cart item quantity must be available in stock.
+    \item Checkout with multiple currencies is rejected.
+    \item Product stock is decreased during checkout.
+    \item The cart is cleared after successful checkout.
+    \item The created order starts with status \texttt{pending\_payment}.
+    \item Checkout also creates a pending mock payment.
+    \item The operation is transactional: order creation, payment creation, stock changes, and cart clearing are handled together.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+POST /orders/checkout
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "shippingAddress": {
+        "fullName": "Jan Kowalski",
+        "line1": "Example Street 12",
+        "line2": "Apartment 4",
+        "city": "Warsaw",
+        "postalCode": "00-001",
+        "country": "Poland",
+        "phone": "+48123456789"
+    }
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "order": {
+        "id": "665000000000000000000030",
+        "userId": "665000000000000000000001",
+        "status": "pending_payment",
+        "items": [
+            {
+                "productId": "665000000000000000000010",
+                "productName": "Smart Toaster 3000",
+                "productSlug": "smart-toaster-3000",
+                "unitPriceAmount": 24999,
+                "currency": "PLN",
+                "quantity": 2,
+                "imageUrl": "https://example.com/toaster.jpg"
+            }
+        ],
+        "shippingAddress": {
+            "fullName": "Jan Kowalski",
+            "line1": "Example Street 12",
+            "line2": "Apartment 4",
+            "city": "Warsaw",
+            "postalCode": "00-001",
+            "country": "Poland",
+            "phone": "+48123456789"
+        },
+        "totals": {
+            "subtotalAmount": 49998,
+            "shippingAmount": 0,
+            "totalAmount": 49998,
+            "currency": "PLN"
+        },
+        "paymentId": "665000000000000000000040",
+        "createdAt": "2026-05-30T10:00:00.000Z",
+        "updatedAt": "2026-05-30T10:00:00.000Z"
+    },
+    "payment": {
+        "id": "665000000000000000000040",
+        "orderId": "665000000000000000000030",
+        "userId": "665000000000000000000001",
+        "provider": "mock",
+        "status": "pending",
+        "amount": 49998,
+        "currency": "PLN",
+        "createdAt": "2026-05-30T10:00:00.000Z",
+        "updatedAt": "2026-05-30T10:00:00.000Z"
+    }
+}
+\end{minted}
+
+\subsection{\texttt{GET /orders/my}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Returns all orders owned by the currently authenticated user.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The endpoint returns only orders belonging to the authenticated user.
+    \item Orders are returned from newest to oldest.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /orders/my
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+[
+    {
+        "id": "665000000000000000000030",
+        "userId": "665000000000000000000001",
+        "status": "pending_payment",
+        "items": [
+            {
+                "productId": "665000000000000000000010",
+                "productName": "Smart Toaster 3000",
+                "productSlug": "smart-toaster-3000",
+                "unitPriceAmount": 24999,
+                "currency": "PLN",
+                "quantity": 2
+            }
+        ],
+        "shippingAddress": {
+            "fullName": "Jan Kowalski",
+            "line1": "Example Street 12",
+            "city": "Warsaw",
+            "postalCode": "00-001",
+            "country": "Poland"
+        },
+        "totals": {
+            "subtotalAmount": 49998,
+            "shippingAmount": 0,
+            "totalAmount": 49998,
+            "currency": "PLN"
+        },
+        "paymentId": "665000000000000000000040",
+        "createdAt": "2026-05-30T10:00:00.000Z",
+        "updatedAt": "2026-05-30T10:00:00.000Z"
+    }
+]
+\end{minted}
+
+\subsection{\texttt{GET /orders/:id}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Returns one order owned by the currently authenticated user.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- order ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The endpoint returns only an order belonging to the authenticated user.
+    \item If the order does not exist or belongs to another user, the response is \texttt{404 Not Found}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /orders/665000000000000000000030
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000030",
+    "userId": "665000000000000000000001",
+    "status": "pending_payment",
+    "items": [
+        {
+            "productId": "665000000000000000000010",
+            "productName": "Smart Toaster 3000",
+            "productSlug": "smart-toaster-3000",
+            "unitPriceAmount": 24999,
+            "currency": "PLN",
+            "quantity": 2,
+            "imageUrl": "https://example.com/toaster.jpg"
+        }
+    ],
+    "shippingAddress": {
+        "fullName": "Jan Kowalski",
+        "line1": "Example Street 12",
+        "line2": "Apartment 4",
+        "city": "Warsaw",
+        "postalCode": "00-001",
+        "country": "Poland",
+        "phone": "+48123456789"
+    },
+    "totals": {
+        "subtotalAmount": 49998,
+        "shippingAmount": 0,
+        "totalAmount": 49998,
+        "currency": "PLN"
+    },
+    "paymentId": "665000000000000000000040",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}

@@ -1,0 +1,447 @@
+\section{User Endpoints}
+
+User endpoints cover two areas:
+
+\begin{itemize}
+    \item self-service account operations for the currently authenticated user,
+    \item administrator operations for managing users.
+\end{itemize}
+
+Public account registration is documented in the authentication section. The endpoints in this section require authentication.
+
+\subsection{User Response Shape}
+
+Most user endpoints return the following response shape:
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000001",
+    "email": "user@example.com",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+Soft-deleted users may also include:
+
+\begin{minted}[frame=single]{json}
+{
+    "deletedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{GET /users/me}}
+
+\textbf{Access:} Authenticated user or administrator
+
+\textbf{Description:} Returns the currently authenticated active user.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The endpoint uses the current access token to identify the user.
+    \item Deleted users are treated as not found.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /users/me
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000001",
+    "email": "user@example.com",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{PATCH /users/me}}
+
+\textbf{Access:} Authenticated user or administrator
+
+\textbf{Description:} Updates the currently authenticated user's email or password.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "email": "new-email@example.com",
+    "password": "newPassword123",
+    "currentPassword": "oldPassword123"
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{email} --- optional string, must be a valid email address, maximum length: \texttt{254}.
+    \item \texttt{password} --- optional string, minimum length: \texttt{6}, maximum length: \texttt{128}.
+    \item \texttt{currentPassword} --- required when changing email or password, minimum length: \texttt{6}, maximum length: \texttt{128}.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item At least one editable field must be provided.
+    \item The current password is required.
+    \item The current password must match the user's existing password.
+    \item Email addresses are normalized to lowercase.
+    \item Email addresses must be unique.
+    \item This endpoint does not allow changing role or status.
+\end{itemize}
+
+\pagebreak
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+PATCH /users/me
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "email": "new-email@example.com",
+    "currentPassword": "oldPassword123"
+}
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000001",
+    "email": "new-email@example.com",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{DELETE /users/me}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Deactivates the currently authenticated regular user's own account.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Only users with the \texttt{user} role can deactivate their own account.
+    \item Administrators cannot deactivate their own account through this endpoint.
+    \item Deactivation is implemented as soft deletion.
+    \item Successful deletion returns \texttt{204 No Content}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+DELETE /users/me
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\pagebreak
+\subsection{\texttt{POST /users}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Creates a user account. This endpoint can be used by administrators to create either regular users or administrators.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "email": "admin-created-user@example.com",
+    "password": "password123",
+    "role": "user"
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{email} --- required string, must be a valid email address, maximum length: \texttt{254}.
+    \item \texttt{password} --- required string, minimum length: \texttt{6}, maximum length: \texttt{128}.
+    \item \texttt{role} --- optional enum: \texttt{user}, \texttt{admin}. Defaults to \texttt{user} when omitted.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Only administrators can call this endpoint.
+    \item Email addresses are normalized to lowercase.
+    \item Email addresses must be unique.
+    \item Created users start with status \texttt{active}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+POST /users
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "email": "admin-created-user@example.com",
+    "password": "password123",
+    "role": "user"
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000002",
+    "email": "admin-created-user@example.com",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{GET /users}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Returns a paginated list of users.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Query parameters:}
+
+\begin{itemize}
+    \item \texttt{page} --- optional positive integer, default: \texttt{1}.
+    \item \texttt{limit} --- optional positive integer, default: \texttt{20}, maximum: \texttt{100}.
+    \item \texttt{role} --- optional enum: \texttt{user}, \texttt{admin}.
+    \item \texttt{search} --- optional string used to search by email.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /users?page=1&limit=20&role=user&search=example
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "items": [
+        {
+            "id": "665000000000000000000002",
+            "email": "admin-created-user@example.com",
+            "role": "user",
+            "status": "active",
+            "createdAt": "2026-05-30T10:00:00.000Z",
+            "updatedAt": "2026-05-30T10:00:00.000Z"
+        }
+    ],
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+}
+\end{minted}
+
+\subsection{\texttt{GET /users/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Returns a specific user by identifier.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- user ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /users/665000000000000000000002
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000002",
+    "email": "admin-created-user@example.com",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\pagebreak
+\subsection{\texttt{PATCH /users/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Updates a user account by identifier.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- user ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "email": "updated-user@example.com",
+    "password": "newPassword123",
+    "role": "admin",
+    "status": "active"
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{email} --- optional string, must be a valid email address, maximum length: \texttt{254}.
+    \item \texttt{password} --- optional string, minimum length: \texttt{6}, maximum length: \texttt{128}.
+    \item \texttt{role} --- optional enum: \texttt{user}, \texttt{admin}.
+    \item \texttt{status} --- optional enum: \texttt{active}, \texttt{deleted}.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item At least one editable field must be provided.
+    \item Email addresses are normalized to lowercase.
+    \item Email addresses must be unique.
+    \item The system prevents removing or demoting the last active administrator.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+PATCH /users/665000000000000000000002
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "role": "admin"
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000002",
+    "email": "admin-created-user@example.com",
+    "role": "admin",
+    "status": "active",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:10:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{DELETE /users/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Soft-deletes a user account by identifier.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- user ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The endpoint changes the user status to \texttt{deleted}.
+    \item The system prevents deleting the last active administrator.
+    \item Successful deletion returns \texttt{204 No Content}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+DELETE /users/665000000000000000000002
+Authorization: Bearer <adminAccessToken>
+\end{minted}

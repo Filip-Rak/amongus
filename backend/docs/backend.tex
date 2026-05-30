@@ -1,0 +1,33 @@
+\documentclass[12pt]{article}
+\setlength{\parskip}{0.5em}
+
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{parskip}
+\usepackage{graphicx}
+\usepackage{minted}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{dirtree}
+\usepackage{float}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+
+\begin{document}
+
+\input{sections/api-overview}
+\input{sections/common-conventions}
+
+\pagebreak \input{sections/health-endpoints.tex}
+\pagebreak \input{sections/auth-endpoints.tex}
+\pagebreak \input{sections/users-endpoints.tex}
+\pagebreak \input{sections/categories-endpoints.tex}
+\pagebreak \input{sections/products-endpoints.tex}
+\pagebreak \input{sections/cart-endpoints.tex}
+\pagebreak \input{sections/orders-endpoints.tex}
+\pagebreak \input{sections/payments-endpoints.tex}
+\pagebreak \input{sections/reviews-endpoints.tex}
+
+\end{document}

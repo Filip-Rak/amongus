@@ -1,0 +1,122 @@
+\section{API Overview}
+
+This document describes the HTTP API for an online shop backend. The backend exposes endpoints for user accounts, authentication, hierarchical product categories, category-defined product attributes, products, carts, orders, mock payments, and product reviews.
+
+The API is designed around common shop views and actions. Product listing views can request products directly, category views can request category trees and category-specific products, and product creation forms can request inherited category attributes before submitting product data. Most frontend views should be able to use one or two API calls without needing to understand the internal database structure.
+
+\subsection{Main Features}
+
+The backend currently supports the following functional areas:
+
+\begin{itemize}
+    \item user registration, login, and authenticated profile access,
+    \item administrator-managed users,
+    \item nested product categories,
+    \item product attributes defined by category inheritance,
+    \item product creation, listing, filtering, updating, and archiving,
+    \item shopping cart management,
+    \item checkout with order creation,
+    \item mock payment success and failure flow,
+    \item reviews limited to users who bought and paid for a product,
+    \item MongoDB validation, indexes, and transaction-based operations where needed.
+\end{itemize}
+
+\subsection{Backend Responsibilities}
+
+The backend is responsible for enforcing the main business rules. The frontend may validate inputs for user experience, but the backend remains the source of truth.
+
+Important backend-side rules include:
+
+\begin{itemize}
+    \item only administrators can create, update, or archive products and categories,
+    \item only administrators can create another administrator account,
+    \item products must belong to an active category,
+    \item product attribute values must match the attributes inherited from the selected category,
+    \item checkout decreases product stock and creates both an order and a pending payment,
+    \item users can review only products they bought and paid for,
+    \item each user can have only one active review per product,
+    \item archived and soft-deleted records are hidden from normal public endpoints.
+\end{itemize}
+
+\subsection{Category and Product Attribute Model}
+
+Categories are hierarchical. A category may have a parent category, and every category stores its ancestor identifiers and depth level.
+
+For example:
+
+\begin{verbatim}
+RTV
+-> Computers
+-> Keyboards
+-> Smart Toasters
+\end{verbatim}
+
+Categories also define product attributes. A child category inherits attributes from all of its ancestors.
+
+For example, a root category may define general attributes:
+
+\begin{itemize}
+    \item \texttt{brand},
+    \item \texttt{warranty\_months}.
+\end{itemize}
+
+A child category may define more specific attributes:
+
+\begin{itemize}
+    \item \texttt{layout},
+    \item \texttt{switch\_type},
+    \item \texttt{slices},
+    \item \texttt{burn\_pattern}.
+\end{itemize}
+
+A product does not define arbitrary attributes by itself. Instead, it stores values for attributes defined by its category chain.
+
+\begin{minted}[frame=single]{json}
+{
+    "categoryId": "665000000000000000000001",
+    "attributeValues": {
+    "brand": "Samsung",
+    "warranty_months": 24,
+    "burn_pattern": "qr_code",
+    "slices": 4
+    }
+}
+\end{minted}
+
+This allows the frontend to build product forms dynamically. When an administrator selects a category, the frontend can request inherited attribute definitions from:
+
+\begin{minted}{http}
+GET /categories/:id/attributes
+\end{minted}
+
+The response tells the frontend which fields to render, which fields are required, which values are allowed, and which numeric constraints apply.
+
+\subsection{Typical Frontend Flows}
+
+\subsubsection{Administrator creates a product}
+
+\begin{enumerate}
+    \item Fetch category tree using \texttt{GET /categories/tree}.
+    \item Administrator selects a category.
+    \item Fetch inherited attributes using \texttt{GET /categories/:id/attributes}.
+    \item Render product form fields based on returned attributes.
+    \item Submit product using \texttt{POST /products}.
+\end{enumerate}
+
+\subsubsection{User buys a product}
+
+\begin{enumerate}
+    \item Browse products using \texttt{GET /products}.
+    \item Add product to cart using \texttt{POST /cart/items}.
+    \item Review cart using \texttt{GET /cart}.
+    \item Checkout using \texttt{POST /orders/checkout}.
+    \item Complete mock payment using \texttt{POST /payments/:id/mock-success}.
+\end{enumerate}
+
+\subsubsection{User reviews a product}
+
+\begin{enumerate}
+    \item User completes checkout and payment.
+    \item User submits a review using \texttt{POST /products/:productId/reviews}.
+    \item Product rating summary is updated by the backend.
+\end{enumerate}

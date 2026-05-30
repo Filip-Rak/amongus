@@ -1,0 +1,713 @@
+\section{Category Endpoints}
+
+Category endpoints expose the product category hierarchy. Categories are nested, can define product attribute definitions, and can inherit attributes from ancestor categories.
+
+Categories are public for reading, while creation, update, and archiving require administrator access.
+
+\subsection{Category Response Shape}
+
+Most category endpoints return a category object with the following structure:
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000001",
+    "name": "Smart Toasters",
+    "slug": "smart-toasters",
+    "parentId": "665000000000000000000000",
+    "ancestorIds": [
+        "664000000000000000000000"
+    ],
+    "level": 1,
+    "description": "High-tech bread scorching appliances.",
+    "status": "active",
+    "attributeDefinitions": [
+        {
+            "key": "burn_pattern",
+            "label": "Burn Pattern",
+            "type": "string",
+            "isRequired": true,
+            "allowedValues": [
+                "sad_face",
+                "qr_code",
+                "obama"
+            ]
+        }
+    ],
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+Root categories do not have \texttt{parentId}. They have \texttt{ancestorIds} as an empty array and \texttt{level} equal to \texttt{0}.
+
+\pagebreak
+\subsection{Category Attribute Definition Shape}
+
+Category attributes describe which product attribute values may be provided for products assigned to a category.
+
+\begin{minted}[frame=single]{json}
+{
+    "key": "slices",
+    "label": "Slices Capacity",
+    "type": "number",
+    "isRequired": true,
+    "min": 1,
+    "max": 8,
+    "unit": "slices"
+}
+\end{minted}
+
+\textbf{Attribute definition fields:}
+
+\begin{itemize}
+    \item \texttt{key} --- required string, valid identifier using lowercase letters, numbers, and underscores. It must start with a letter.
+    \item \texttt{label} --- required string, human-readable field label.
+    \item \texttt{type} --- required enum: \texttt{string}, \texttt{number}, \texttt{boolean}, \texttt{string\_array}.
+    \item \texttt{isRequired} --- required boolean. If true, products in this category branch must provide a value for this attribute.
+    \item \texttt{allowedValues} --- optional string array. Useful for select and multi-select fields.
+    \item \texttt{min} --- optional number. Useful for numeric attributes.
+    \item \texttt{max} --- optional number. Useful for numeric attributes.
+    \item \texttt{unit} --- optional string. Useful for displaying numeric attributes.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Attribute keys must be unique within a category.
+    \item A child category cannot redefine an attribute key inherited from an ancestor category.
+    \item If both \texttt{min} and \texttt{max} are provided, \texttt{min} cannot be greater than \texttt{max}.
+    \item Products store attribute values, while categories define which attributes are allowed.
+\end{itemize}
+
+\subsection{\texttt{GET /categories}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns a paginated list of active categories.
+
+\textbf{Query parameters:}
+
+\begin{itemize}
+    \item \texttt{page} --- optional positive integer, default: \texttt{1}.
+    \item \texttt{limit} --- optional positive integer, default: \texttt{20}, maximum: \texttt{100}.
+    \item \texttt{search} --- optional string used to search categories.
+    \item \texttt{status} --- optional enum: \texttt{active}, \texttt{archived}. On public endpoints, only active categories are returned.
+    \item \texttt{parentId} --- optional category ObjectId or \texttt{root}. Use \texttt{root} to request root categories only.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories?page=1&limit=20
+\end{minted}
+
+\textbf{Example root category request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories?parentId=root
+\end{minted}
+
+\textbf{Example child category request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories?parentId=665000000000000000000001
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "items": [
+        {
+            "id": "665000000000000000000001",
+            "name": "RTV",
+            "slug": "rtv",
+            "ancestorIds": [],
+            "level": 0,
+            "description": "Electronics and home media products",
+            "status": "active",
+            "attributeDefinitions": [],
+            "createdAt": "2026-05-30T10:00:00.000Z",
+            "updatedAt": "2026-05-30T10:00:00.000Z"
+        }
+    ],
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+}
+\end{minted}
+
+\subsection{\texttt{GET /categories/root}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns active root categories. Root categories are categories without a parent category.
+
+\textbf{Request body:} None.
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/root
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+[
+    {
+        "id": "665000000000000000000001",
+        "name": "RTV",
+        "slug": "rtv",
+        "ancestorIds": [],
+        "level": 0,
+        "description": "Electronics and home media products",
+        "status": "active",
+        "attributeDefinitions": [],
+        "createdAt": "2026-05-30T10:00:00.000Z",
+        "updatedAt": "2026-05-30T10:00:00.000Z"
+    }
+]
+\end{minted}
+
+\subsection{\texttt{GET /categories/tree}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns all active categories as a nested tree.
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Only active categories are returned.
+    \item Each category may contain a \texttt{children} array.
+    \item This endpoint is useful for category menus and category selection trees.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/tree
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+[
+    {
+        "id": "665000000000000000000001",
+        "name": "RTV",
+        "slug": "rtv",
+        "ancestorIds": [],
+        "level": 0,
+        "description": "Electronics and home media products",
+        "status": "active",
+        "attributeDefinitions": [],
+        "createdAt": "2026-05-30T10:00:00.000Z",
+        "updatedAt": "2026-05-30T10:00:00.000Z",
+        "children": [
+            {
+                "id": "665000000000000000000002",
+                "name": "Smart Toasters",
+                "slug": "smart-toasters",
+                "parentId": "665000000000000000000001",
+                "ancestorIds": [
+                    "665000000000000000000001"
+                ],
+                "level": 1,
+                "description": "High-tech bread scorching appliances.",
+                "status": "active",
+                "attributeDefinitions": [],
+                "createdAt": "2026-05-30T10:00:00.000Z",
+                "updatedAt": "2026-05-30T10:00:00.000Z",
+                "children": []
+            }
+        ]
+    }
+]
+\end{minted}
+
+\subsection{\texttt{GET /categories/:id}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns one active category by identifier.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- category ObjectId.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/665000000000000000000001
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000001",
+    "name": "RTV",
+    "slug": "rtv",
+    "ancestorIds": [],
+    "level": 0,
+    "description": "Electronics and home media products",
+    "status": "active",
+    "attributeDefinitions": [],
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{GET /categories/slug/:slug}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns one active category by slug.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{slug} --- category slug.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/slug/smart-toasters
+\end{minted}
+
+\subsection{\texttt{GET /categories/:id/children}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns direct active children of the selected category.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- parent category ObjectId.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/665000000000000000000001/children
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+[
+    {
+        "id": "665000000000000000000002",
+        "name": "Smart Toasters",
+        "slug": "smart-toasters",
+        "parentId": "665000000000000000000001",
+        "ancestorIds": [
+            "665000000000000000000001"
+        ],
+        "level": 1,
+        "description": "High-tech bread scorching appliances.",
+        "status": "active",
+        "attributeDefinitions": [],
+        "createdAt": "2026-05-30T10:00:00.000Z",
+        "updatedAt": "2026-05-30T10:00:00.000Z"
+    }
+]
+\end{minted}
+
+\subsection{\texttt{GET /categories/:id/tree}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns one active category with its active descendants as a subtree.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- root category ObjectId for the subtree.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/665000000000000000000001/tree
+\end{minted}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item This endpoint is useful for rendering a category branch.
+    \item Only active categories are returned.
+\end{itemize}
+
+\subsection{\texttt{GET /categories/:id/attributes}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns inherited attribute definitions for a category. The response includes attributes defined by ancestor categories and by the selected category.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- category ObjectId.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item This endpoint should be used by the frontend when building product creation or product update forms.
+    \item Returned attributes are already merged in inheritance order.
+    \item Products assigned to this category may only provide values for these attributes.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/665000000000000000000002/attributes
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "categoryId": "665000000000000000000002",
+    "attributes": [
+        {
+            "key": "brand",
+            "label": "Brand",
+            "type": "string",
+            "isRequired": true,
+            "allowedValues": [
+                "Samsung",
+                "Sony",
+                "Logitech"
+            ]
+        },
+        {
+            "key": "burn_pattern",
+            "label": "Burn Pattern",
+            "type": "string",
+            "isRequired": true,
+            "allowedValues": [
+                "sad_face",
+                "qr_code",
+                "obama"
+            ]
+        },
+        {
+            "key": "slices",
+            "label": "Slices Capacity",
+            "type": "number",
+            "isRequired": true,
+            "min": 1,
+            "max": 8
+        }
+    ]
+}
+\end{minted}
+
+\subsection{\texttt{GET /categories/admin}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Returns a paginated category list for administrators. Unlike the public list, this endpoint may include archived categories.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Query parameters:}
+
+\begin{itemize}
+    \item \texttt{page} --- optional positive integer, default: \texttt{1}.
+    \item \texttt{limit} --- optional positive integer, default: \texttt{20}, maximum: \texttt{100}.
+    \item \texttt{search} --- optional string used to search categories.
+    \item \texttt{status} --- optional enum: \texttt{active}, \texttt{archived}.
+    \item \texttt{parentId} --- optional category ObjectId or \texttt{root}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/admin?status=archived&page=1&limit=20
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\subsection{\texttt{GET /categories/admin/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Returns one category by identifier, including archived categories.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- category ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /categories/admin/665000000000000000000001
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\subsection{\texttt{POST /categories}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Creates a category. If \texttt{parentId} is omitted, a root category is created. If \texttt{parentId} is provided, the category becomes a child of the selected active parent category.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "name": "Smart Toasters",
+    "slug": "smart-toasters",
+    "parentId": "665000000000000000000001",
+    "description": "High-tech bread scorching appliances.",
+    "status": "active",
+    "attributeDefinitions": [
+        {
+            "key": "burn_pattern",
+            "label": "Burn Pattern",
+            "type": "string",
+            "isRequired": true,
+            "allowedValues": [
+                "sad_face",
+                "qr_code",
+                "obama"
+            ]
+        },
+        {
+            "key": "slices",
+            "label": "Slices Capacity",
+            "type": "number",
+            "isRequired": true,
+            "min": 1,
+            "max": 8
+        }
+    ]
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{name} --- required string.
+    \item \texttt{slug} --- optional slug string. If omitted, it is generated from \texttt{name}.
+    \item \texttt{parentId} --- optional parent category ObjectId.
+    \item \texttt{description} --- optional string.
+    \item \texttt{status} --- optional enum: \texttt{active}. Creating a category as \texttt{archived} is rejected.
+    \item \texttt{attributeDefinitions} --- optional array of category attribute definitions.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Only administrators can create categories.
+    \item A new category cannot be created as \texttt{archived}.
+    \item If \texttt{parentId} is omitted, a root category is created.
+    \item If \texttt{parentId} is provided, the parent category must exist and be active.
+    \item The maximum category depth is limited.
+    \item Attribute keys must be unique within the new category.
+    \item A child category cannot define an attribute key already inherited from an ancestor.
+    \item Category slugs must be unique.
+\end{itemize}
+
+\textbf{Example root category request:}
+
+\begin{minted}[frame=single]{http}
+POST /categories
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "name": "RTV",
+    "slug": "rtv",
+    "description": "Electronics and home media products",
+    "status": "active",
+    "attributeDefinitions": [
+        {
+            "key": "brand",
+            "label": "Brand",
+            "type": "string",
+            "isRequired": true,
+            "allowedValues": [
+                "Samsung",
+                "Sony",
+                "Logitech"
+            ]
+        }
+    ]
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example child category request:}
+
+\begin{minted}[frame=single]{http}
+POST /categories
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "name": "Smart Toasters",
+    "slug": "smart-toasters",
+    "parentId": "665000000000000000000001",
+    "description": "High-tech bread scorching appliances.",
+    "status": "active",
+    "attributeDefinitions": [
+        {
+            "key": "slices",
+            "label": "Slices Capacity",
+            "type": "number",
+            "isRequired": true,
+            "min": 1,
+            "max": 8
+        }
+    ]
+}
+\end{minted}
+
+\subsection{\texttt{PATCH /categories/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Updates category metadata, status, or attribute definitions.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- category ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\pagebreak
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "name": "Updated Category Name",
+    "slug": "updated-category-name",
+    "description": "Updated category description.",
+    "status": "active",
+    "attributeDefinitions": [
+        {
+            "key": "slices",
+            "label": "Slices Capacity",
+            "type": "number",
+            "isRequired": true,
+            "min": 1,
+            "max": 8
+        }
+    ]
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{name} --- optional string.
+    \item \texttt{slug} --- optional slug string.
+    \item \texttt{description} --- optional string.
+    \item \texttt{status} --- optional enum: \texttt{active}, \texttt{archived}.
+    \item \texttt{attributeDefinitions} --- optional array of category attribute definitions.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item At least one editable field must be provided.
+    \item \texttt{parentId} cannot be changed by this endpoint.
+    \item Category slugs must be unique.
+    \item Attribute keys must be unique within the category.
+    \item A category cannot define an attribute key already inherited from an ancestor.
+    \item Updating \texttt{status} to \texttt{archived} sets \texttt{archivedAt}.
+    \item Updating \texttt{status} away from \texttt{archived} removes \texttt{archivedAt}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+PATCH /categories/665000000000000000000002
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "description": "Updated category description."
+}
+\end{minted}
+
+\subsection{\texttt{DELETE /categories/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Archives a category.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- category ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The endpoint archives the category instead of hard-deleting it.
+    \item Categories with child categories cannot be archived.
+    \item Archiving sets category status to \texttt{archived}.
+    \item Successful archive returns \texttt{204 No Content}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+DELETE /categories/665000000000000000000002
+Authorization: Bearer <adminAccessToken>
+\end{minted}

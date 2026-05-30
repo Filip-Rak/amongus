@@ -1,0 +1,568 @@
+\section{Product Endpoints}
+
+Product endpoints expose product listing, product details, and administrator product management.
+
+Public product endpoints return only active products. Administrator endpoints can access products regardless of status.
+
+Products belong to categories. Product-specific attributes are stored as \texttt{attributeValues}, but the allowed attribute keys and constraints are defined by the selected category and its ancestors.
+
+\subsection{Product Response Shape}
+
+Most product endpoints return the following product shape:
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000010",
+    "name": "Smart Toaster 3000",
+    "slug": "smart-toaster-3000",
+    "description": "A toaster with advanced burn pattern support.",
+    "price": {
+        "amount": 24999,
+        "currency": "PLN"
+    },
+    "stock": 10,
+    "categoryId": "665000000000000000000002",
+    "images": [
+        {
+            "url": "https://example.com/toaster.jpg",
+            "alt": "Smart Toaster 3000",
+            "isPrimary": true
+        }
+    ],
+    "attributeValues": {
+        "brand": "Samsung",
+        "warranty_months": 24,
+        "burn_pattern": "qr_code",
+        "slices": 4
+    },
+    "status": "active",
+    "averageRating": 4.5,
+    "reviewCount": 12,
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\pagebreak
+Archived products may also include:
+
+\begin{minted}[frame=single]{json}
+{
+    "archivedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\subsection{Product Price Shape}
+
+Product prices use minor currency units.
+
+\begin{minted}[frame=single]{json}
+{
+    "amount": 24999,
+    "currency": "PLN"
+}
+\end{minted}
+
+This represents \texttt{249.99 PLN}.
+
+\textbf{Price fields:}
+
+\begin{itemize}
+    \item \texttt{amount} --- required integer, minimum: \texttt{0}.
+    \item \texttt{currency} --- required enum: \texttt{PLN}, \texttt{EUR}, \texttt{USD}.
+\end{itemize}
+
+\subsection{Product Image Shape}
+
+\begin{minted}[frame=single]{json}
+{
+    "url": "https://example.com/product.jpg",
+    "alt": "Product image",
+    "isPrimary": true
+}
+\end{minted}
+
+\textbf{Image fields:}
+
+\begin{itemize}
+    \item \texttt{url} --- required URL string. The URL must use \texttt{http} or \texttt{https}.
+    \item \texttt{alt} --- optional string.
+    \item \texttt{isPrimary} --- required boolean.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item A product can have at most one primary image.
+    \item If images are provided but none is marked as primary, the backend marks the first image as primary.
+\end{itemize}
+
+\pagebreak
+\subsection{Product Attribute Values}
+
+Products store attribute values in the \texttt{attributeValues} object.
+
+\begin{minted}[frame=single]{json}
+{
+    "attributeValues": {
+        "brand": "Samsung",
+        "warranty_months": 24,
+        "burn_pattern": "qr_code",
+        "slices": 4
+    }
+}
+\end{minted}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item A product must belong to an active category.
+    \item Allowed product attribute keys come from the selected category and its ancestors.
+    \item Required category attributes must be present in \texttt{attributeValues}.
+    \item Attribute values must match their category-defined type.
+    \item String attributes with \texttt{allowedValues} must use one of those values.
+    \item Number attributes must satisfy optional \texttt{min} and \texttt{max} constraints.
+    \item Boolean attributes must be boolean values.
+    \item \texttt{string\_array} attributes must be arrays of strings.
+\end{itemize}
+
+Before creating or editing a product, the frontend should usually call:
+
+\begin{minted}[frame=single]{http}
+GET /categories/:id/attributes
+\end{minted}
+
+This returns the inherited attribute definitions needed to build the product form.
+
+\subsection{\texttt{GET /products}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns a paginated list of active products.
+
+\textbf{Query parameters:}
+
+\begin{itemize}
+    \item \texttt{page} --- optional positive integer, default: \texttt{1}.
+    \item \texttt{limit} --- optional positive integer, default: \texttt{20}, maximum: \texttt{100}.
+    \item \texttt{search} --- optional string used to search products.
+    \item \texttt{status} --- optional enum: \texttt{draft}, \texttt{active}, \texttt{archived}. Public listing still returns only active products.
+    \item \texttt{minPrice} --- optional integer, minimum price amount in minor currency units.
+    \item \texttt{maxPrice} --- optional integer, maximum price amount in minor currency units.
+    \item \texttt{inStockOnly} --- optional boolean: \texttt{true} or \texttt{false}.
+    \item \texttt{categoryId} --- optional category ObjectId.
+    \item \texttt{includeSubcategories} --- optional boolean. When used with \texttt{categoryId}, includes products from descendant categories.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Public listing returns active products only.
+    \item \texttt{minPrice} cannot be greater than \texttt{maxPrice}.
+    \item If \texttt{categoryId} is provided, the category must exist and be active.
+    \item If \texttt{includeSubcategories=true}, products from descendant categories are included.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /products?page=1&limit=20
+\end{minted}
+
+\textbf{Example category branch request:}
+
+\begin{minted}[frame=single]{http}
+GET /products?categoryId=665000000000000000000002&includeSubcategories=true
+\end{minted}
+
+\textbf{Example filtered request:}
+
+\begin{minted}[frame=single]{http}
+GET /products?search=toaster&minPrice=10000&maxPrice=30000&inStockOnly=true
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "items": [
+        {
+            "id": "665000000000000000000010",
+            "name": "Smart Toaster 3000",
+            "slug": "smart-toaster-3000",
+            "description": "A toaster with advanced burn pattern support.",
+            "price": {
+                "amount": 24999,
+                "currency": "PLN"
+            },
+            "stock": 10,
+            "categoryId": "665000000000000000000002",
+            "images": [],
+            "attributeValues": {
+                "brand": "Samsung",
+                "burn_pattern": "qr_code",
+                "slices": 4
+            },
+            "status": "active",
+            "averageRating": 0,
+            "reviewCount": 0,
+            "createdAt": "2026-05-30T10:00:00.000Z",
+            "updatedAt": "2026-05-30T10:00:00.000Z"
+        }
+    ],
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+}
+\end{minted}
+
+\subsection{\texttt{GET /products/:id}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns one active product by identifier.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- product ObjectId.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /products/665000000000000000000010
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000010",
+    "name": "Smart Toaster 3000",
+    "slug": "smart-toaster-3000",
+    "description": "A toaster with advanced burn pattern support.",
+    "price": {
+        "amount": 24999,
+        "currency": "PLN"
+    },
+    "stock": 10,
+    "categoryId": "665000000000000000000002",
+    "images": [],
+    "attributeValues": {
+        "brand": "Samsung",
+        "burn_pattern": "qr_code",
+        "slices": 4
+    },
+    "status": "active",
+    "averageRating": 0,
+    "reviewCount": 0,
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{GET /products/slug/:slug}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Returns one active product by slug.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{slug} --- product slug.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /products/slug/smart-toaster-3000
+\end{minted}
+
+\subsection{\texttt{GET /products/admin}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Returns a paginated product list for administrators. Unlike the public listing, this endpoint can include draft and archived products.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Query parameters:}
+
+\begin{itemize}
+    \item \texttt{page} --- optional positive integer, default: \texttt{1}.
+    \item \texttt{limit} --- optional positive integer, default: \texttt{20}, maximum: \texttt{100}.
+    \item \texttt{search} --- optional string used to search products.
+    \item \texttt{status} --- optional enum: \texttt{draft}, \texttt{active}, \texttt{archived}.
+    \item \texttt{minPrice} --- optional integer, minimum price amount in minor currency units.
+    \item \texttt{maxPrice} --- optional integer, maximum price amount in minor currency units.
+    \item \texttt{inStockOnly} --- optional boolean: \texttt{true} or \texttt{false}.
+    \item \texttt{categoryId} --- optional category ObjectId.
+    \item \texttt{includeSubcategories} --- optional boolean. When used with \texttt{categoryId}, includes products from descendant categories.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /products/admin?status=draft&page=1&limit=20
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\subsection{\texttt{GET /products/admin/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Returns one product by identifier, including draft or archived products.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- product ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /products/admin/665000000000000000000010
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\subsection{\texttt{POST /products}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Creates a product.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "name": "Smart Toaster 3000",
+    "slug": "smart-toaster-3000",
+    "description": "A toaster with advanced burn pattern support.",
+    "price": {
+        "amount": 24999,
+        "currency": "PLN"
+    },
+    "stock": 10,
+    "categoryId": "665000000000000000000002",
+    "images": [
+        {
+            "url": "https://example.com/toaster.jpg",
+            "alt": "Smart Toaster 3000",
+            "isPrimary": true
+        }
+    ],
+    "attributeValues": {
+        "brand": "Samsung",
+        "warranty_months": 24,
+        "burn_pattern": "qr_code",
+        "slices": 4
+    },
+    "status": "active"
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{name} --- required string.
+    \item \texttt{slug} --- optional slug string. If omitted, it is generated from \texttt{name}.
+    \item \texttt{description} --- required string.
+    \item \texttt{price} --- required object containing \texttt{amount} and \texttt{currency}.
+    \item \texttt{stock} --- required integer, minimum: \texttt{0}.
+    \item \texttt{categoryId} --- required active category ObjectId.
+    \item \texttt{images} --- optional array of product images.
+    \item \texttt{attributeValues} --- optional object containing product attribute values. Required category attributes must still be present.
+    \item \texttt{status} --- optional enum: \texttt{draft}, \texttt{active}. Defaults to \texttt{draft}. Creating a product as \texttt{archived} is rejected.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Only administrators can create products.
+    \item New products cannot be created as \texttt{archived}.
+    \item Product slugs must be unique.
+    \item The selected category must exist and be active.
+    \item \texttt{attributeValues} must match the inherited attributes for the selected category.
+    \item Required inherited category attributes must be present.
+    \item Only one image can be primary.
+    \item If images are provided and none is primary, the first image is made primary.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+POST /products
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "name": "Smart Toaster 3000",
+    "description": "A toaster with advanced burn pattern support.",
+    "price": {
+        "amount": 24999,
+        "currency": "PLN"
+    },
+    "stock": 10,
+    "categoryId": "665000000000000000000002",
+    "images": [],
+    "attributeValues": {
+        "brand": "Samsung",
+        "burn_pattern": "qr_code",
+        "slices": 4
+    },
+    "status": "active"
+}
+\end{minted}
+
+\subsection{\texttt{PATCH /products/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Updates a product.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- product ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\pagebreak
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "name": "Updated Smart Toaster 3000",
+    "slug": "updated-smart-toaster-3000",
+    "description": "Updated product description.",
+    "price": {
+        "amount": 25999,
+        "currency": "PLN"
+    },
+    "stock": 15,
+    "categoryId": "665000000000000000000002",
+    "images": [
+        {
+            "url": "https://example.com/toaster-updated.jpg",
+            "alt": "Updated Smart Toaster 3000",
+            "isPrimary": true
+        }
+    ],
+    "attributeValues": {
+        "brand": "Samsung",
+        "warranty_months": 24,
+        "burn_pattern": "sad_face",
+        "slices": 4
+    },
+    "status": "active"
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{name} --- optional string.
+    \item \texttt{slug} --- optional slug string.
+    \item \texttt{description} --- optional string.
+    \item \texttt{price} --- optional object containing \texttt{amount} and \texttt{currency}.
+    \item \texttt{stock} --- optional integer, minimum: \texttt{0}.
+    \item \texttt{categoryId} --- optional active category ObjectId.
+    \item \texttt{images} --- optional array of product images.
+    \item \texttt{attributeValues} --- optional object containing product attribute values.
+    \item \texttt{status} --- optional enum: \texttt{draft}, \texttt{active}, \texttt{archived}.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item At least one editable field must be provided.
+    \item Product slugs must be unique.
+    \item If \texttt{categoryId} is changed, the new category must exist and be active.
+    \item The effective \texttt{attributeValues} must match the effective category.
+    \item If \texttt{attributeValues} is omitted, existing product attribute values are validated against the effective category.
+    \item Only one image can be primary.
+    \item If images are provided and none is primary, the first image is made primary.
+    \item Updating status to \texttt{archived} sets \texttt{archivedAt}.
+    \item Updating status away from \texttt{archived} removes \texttt{archivedAt}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+PATCH /products/665000000000000000000010
+Authorization: Bearer <adminAccessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "stock": 15,
+    "status": "active"
+}
+\end{minted}
+
+\subsection{\texttt{DELETE /products/:id}}
+
+\textbf{Access:} Administrator
+
+\textbf{Description:} Archives a product.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- product ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <adminAccessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The endpoint archives the product instead of hard-deleting it.
+    \item Archiving sets product status to \texttt{archived}.
+    \item Successful archive returns \texttt{204 No Content}.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+DELETE /products/665000000000000000000010
+Authorization: Bearer <adminAccessToken>
+\end{minted}

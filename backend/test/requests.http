@@ -157,7 +157,7 @@ DELETE {{baseUrl}}/users/me
 # CATEGORIES
 # =========================
 
-@categoryId = 6a1aa761a1e1ddff840cb33f
+@categoryId = 6a1acbd0a3073b4327610e18
 @parentCategoryId = 6a1aab17be4f8dfeda905891
 @categorySlug = keyboards
 
@@ -734,8 +734,6 @@ DELETE {{baseUrl}}/reviews/admin/{{adminReviewId}}
 {{auth}}
 
 # TODO: 
-# Run tests. 
 # Add more stuff to checkout.
 # Add docs.
-# Add example stuff.
 # Final cleanup.

@@ -1,0 +1,239 @@
+\section{Payment Endpoints}
+
+Payment endpoints expose the mock payment flow used by the shop.
+
+Payments are created automatically during checkout. The API does not expose a direct endpoint for creating payments manually. After checkout, the returned payment can be marked as successful or failed using the mock payment endpoints.
+
+\subsection{Payment Response Shape}
+
+Payment endpoints return the following response shape:
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000040",
+    "orderId": "665000000000000000000030",
+    "userId": "665000000000000000000001",
+    "provider": "mock",
+    "status": "pending",
+    "amount": 49998,
+    "currency": "PLN",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+Successful mock payments may also include:
+
+\begin{minted}[frame=single]{json}
+{
+    "mockTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+    "paidAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+Failed mock payments may also include:
+
+\begin{minted}[frame=single]{json}
+{
+    "failureReason": "Card rejected by mock provider",
+    "failedAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+\subsection{Payment Provider Values}
+
+The current implementation supports one payment provider:
+
+\begin{itemize}
+    \item \texttt{mock}.
+\end{itemize}
+
+\subsection{Payment Status Values}
+
+Payments may use the following status values:
+
+\begin{itemize}
+    \item \texttt{pending},
+    \item \texttt{paid},
+    \item \texttt{failed}.
+\end{itemize}
+
+\subsection{Payment Access Rules}
+
+Payment access is ownership-based.
+
+\begin{itemize}
+    \item A regular user can access only their own payment.
+    \item An administrator can access any payment.
+    \item A payment can be marked as successful or failed only while it has status \texttt{pending}.
+\end{itemize}
+
+\subsection{\texttt{POST /payments/:id/mock-success}}
+
+\textbf{Access:} Authenticated user or administrator
+
+\textbf{Description:} Marks a pending mock payment as paid.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- payment ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The payment must exist.
+    \item Regular users can mark only their own payments as successful.
+    \item Administrators can mark any payment as successful.
+    \item The payment must have status \texttt{pending}.
+    \item The payment status is changed to \texttt{paid}.
+    \item A mock transaction identifier is generated.
+    \item The related order is changed from \texttt{pending\_payment} to \texttt{paid}.
+    \item The operation is transactional with the related order update.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+POST /payments/665000000000000000000040/mock-success
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000040",
+    "orderId": "665000000000000000000030",
+    "userId": "665000000000000000000001",
+    "provider": "mock",
+    "status": "paid",
+    "amount": 49998,
+    "currency": "PLN",
+    "mockTransactionId": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:05:00.000Z",
+    "paidAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+\subsection{\texttt{POST /payments/:id/mock-failure}}
+
+\textbf{Access:} Authenticated user or administrator
+
+\textbf{Description:} Marks a pending mock payment as failed.
+
+\textbf{Path parameters:}
+
+\begin{itemize}
+    \item \texttt{id} --- payment ObjectId.
+\end{itemize}
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "reason": "Card rejected by mock provider"
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{reason} --- optional string describing why the mock payment failed.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The payment must exist.
+    \item Regular users can mark only their own payments as failed.
+    \item Administrators can mark any payment as failed.
+    \item The payment must have status \texttt{pending}.
+    \item If \texttt{reason} is omitted or blank, the backend uses \texttt{Mock payment failed}.
+    \item The payment status is changed to \texttt{failed}.
+    \item The related order is changed from \texttt{pending\_payment} to \texttt{payment\_failed}.
+    \item The operation is transactional with the related order update.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+POST /payments/665000000000000000000040/mock-failure
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+    "reason": "Card rejected by mock provider"
+}
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000040",
+    "orderId": "665000000000000000000030",
+    "userId": "665000000000000000000001",
+    "provider": "mock",
+    "status": "failed",
+    "amount": 49998,
+    "currency": "PLN",
+    "failureReason": "Card rejected by mock provider",
+    "createdAt": "2026-05-30T10:00:00.000Z",
+    "updatedAt": "2026-05-30T10:05:00.000Z",
+    "failedAt": "2026-05-30T10:05:00.000Z"
+}
+\end{minted}
+
+\subsection{Common Payment Errors}
+
+\textbf{Payment not found:}
+
+\begin{minted}[frame=single]{json}
+{
+    "message": "Payment not found",
+    "error": "Not Found",
+    "statusCode": 404
+}
+\end{minted}
+
+\textbf{Payment belongs to another user:}
+
+\begin{minted}[frame=single]{json}
+{
+    "message": "You cannot access this payment",
+    "error": "Forbidden",
+    "statusCode": 403
+}
+\end{minted}
+
+\pagebreak
+\textbf{Payment is no longer pending:}
+
+\begin{minted}[frame=single]{json}
+{
+    "message": "Payment is not pending",
+    "error": "Conflict",
+    "statusCode": 409
+}
+\end{minted}

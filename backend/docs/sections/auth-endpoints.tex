@@ -1,0 +1,207 @@
+\section{Authentication Endpoints}
+
+Authentication endpoints are responsible for registering users, logging users in, and returning information about the currently authenticated user.
+
+Successful registration and login return a Bearer access token. This token should be sent in the \texttt{Authorization} header when calling authenticated endpoints.
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\subsection{\texttt{POST /auth/register}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Creates a new regular user account and immediately returns an access token.
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+	"email": "user@example.com",
+	"password": "password123"
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{email} --- required string, must be a valid email address, maximum length: \texttt{254}.
+    \item \texttt{password} --- required string, minimum length: \texttt{6}, maximum length: \texttt{128}.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Registered users are created with the \texttt{user} role.
+    \item Email addresses are normalized to lowercase.
+    \item Email addresses must be unique.
+    \item Public registration cannot create an administrator account.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+POST /auth/register
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+	"email": "user@example.com",
+	"password": "password123"
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+	"accessToken": "<jwt>",
+	"tokenType": "Bearer",
+	"user": {
+		"id": "665000000000000000000001",
+		"email": "user@example.com",
+		"role": "user"
+	}
+}
+\end{minted}
+
+\subsection{\texttt{POST /auth/login}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Authenticates an existing active user and returns an access token.
+
+\textbf{Request body:}
+
+\begin{minted}[frame=single]{json}
+{
+	"email": "user@example.com",
+	"password": "password123"
+}
+\end{minted}
+
+\textbf{Body fields:}
+
+\begin{itemize}
+    \item \texttt{email} --- required string, must be a valid email address, maximum length: \texttt{254}.
+    \item \texttt{password} --- required string, minimum length: \texttt{6}, maximum length: \texttt{128}.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Email addresses are normalized to lowercase.
+    \item Only active users can log in.
+    \item Invalid email, inactive user, and invalid password all return the same generic authentication error.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+POST /auth/login
+Content-Type: application/json
+\end{minted}
+
+\begin{minted}[frame=single]{json}
+{
+	"email": "user@example.com",
+	"password": "password123"
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+	"accessToken": "<jwt>",
+	"tokenType": "Bearer",
+	"user": {
+		"id": "665000000000000000000001",
+		"email": "user@example.com",
+		"role": "user"
+	}
+}
+\end{minted}
+
+\textbf{Example authentication failure:}
+
+\begin{minted}[frame=single]{json}
+{
+	"message": "Invalid credentials",
+	"error": "Unauthorized",
+	"statusCode": 401
+}
+\end{minted}
+
+\subsection{\texttt{GET /auth/me}}
+
+\textbf{Access:} Authenticated user or administrator
+
+\textbf{Description:} Returns the identity stored in the current access token.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Request body:} None.
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item The endpoint requires a valid Bearer token.
+    \item Expired or invalid tokens are rejected.
+    \item The response describes the authenticated token identity.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /auth/me
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+	"sub": "665000000000000000000001",
+	"email": "user@example.com",
+	"role": "user"
+}
+\end{minted}
+
+\subsection{Authentication Response Shape}
+
+Both \texttt{POST /auth/register} and \texttt{POST /auth/login} return the same response shape:
+
+\begin{minted}[frame=single]{json}
+{
+	"accessToken": "string",
+	"tokenType": "Bearer",
+	"user": {
+		"id": "string",
+		"email": "string",
+		"role": "user | admin"
+	}
+}
+\end{minted}
+
+\subsection{Current User Token Shape}
+
+Authenticated requests identify the current user using the token payload:
+
+\begin{minted}[frame=single]{json}
+{
+	"sub": "string",
+	"email": "string",
+	"role": "user | admin"
+}
+\end{minted}
+
+The \texttt{sub} field contains the user identifier.
