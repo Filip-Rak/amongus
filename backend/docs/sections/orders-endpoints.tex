@@ -4,6 +4,9 @@ Order endpoints allow authenticated regular users to create orders from their ca
 
 The current API exposes only user-owned order operations. There are no administrator order management endpoints in the current version.
 
+Checkout supports both private and company purchases. Invoice-related data is stored directly as part of the order snapshot. The API does not create a separate invoice resource.
+
+\pagebreak
 \subsection{Order Response Shape}
 
 Most order endpoints return the following order shape:
@@ -13,6 +16,11 @@ Most order endpoints return the following order shape:
     "id": "665000000000000000000030",
     "userId": "665000000000000000000001",
     "status": "pending_payment",
+    "purchaseType": "private",
+    "invoice": {
+        "requested": false,
+        "billingAddressSameAsShipping": true
+    },
     "items": [
         {
             "productId": "665000000000000000000010",
@@ -61,6 +69,78 @@ Cancelled orders may also include:
     "cancelledAt": "2026-05-30T10:05:00.000Z"
 }
 \end{minted}
+
+\subsection{Purchase Type Values}
+
+Orders may use the following purchase type values:
+
+\begin{itemize}
+    \item \texttt{private},
+    \item \texttt{company}.
+\end{itemize}
+
+If \texttt{purchaseType} is omitted during checkout, the backend treats the order as a private purchase.
+
+\subsection{Invoice Snapshot Shape}
+
+Invoice data is stored as an order snapshot. It is not a separate resource and does not create a legal invoice document by itself.
+
+A private purchase without invoice request uses the following shape:
+
+\begin{minted}[frame=single]{json}
+{
+    "requested": false,
+    "billingAddressSameAsShipping": true
+}
+\end{minted}
+
+\pagebreak
+A company purchase with invoice request may use the following shape:
+
+\begin{minted}[frame=single]{json}
+{
+    "requested": true,
+    "billingAddressSameAsShipping": false,
+    "billingAddress": {
+        "fullName": "ACME Sp. z o.o.",
+        "line1": "Business Street 1",
+        "city": "Warsaw",
+        "postalCode": "00-002",
+        "country": "Poland"
+    },
+    "companyDetails": {
+        "companyName": "ACME Sp. z o.o.",
+        "taxId": "1234567890"
+    }
+}
+\end{minted}
+
+\textbf{Invoice fields:}
+
+\begin{itemize}
+    \item \texttt{requested} --- boolean indicating whether invoice data was requested.
+    \item \texttt{billingAddressSameAsShipping} --- boolean indicating whether the shipping address should also be used as the billing address.
+    \item \texttt{billingAddress} --- optional billing address object. Required when invoice is requested and billing address is not the same as shipping address.
+    \item \texttt{companyDetails} --- optional company details object. Required for company purchases.
+\end{itemize}
+
+\textbf{Company details fields:}
+
+\begin{itemize}
+    \item \texttt{companyName} --- required string for company purchases.
+    \item \texttt{taxId} --- required string for company purchases.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Company purchases require \texttt{invoice.requested} to be \texttt{true}.
+    \item Company purchases require \texttt{invoice.companyDetails}.
+    \item Private purchases cannot include company details.
+    \item If invoice is not requested, billing address data is not required.
+    \item If invoice is requested and \texttt{billingAddressSameAsShipping} is \texttt{true}, the shipping address is used as the billing address.
+    \item If invoice is requested and \texttt{billingAddressSameAsShipping} is \texttt{false}, \texttt{billingAddress} is required.
+\end{itemize}
 
 \subsection{Order Item Snapshot}
 
@@ -114,6 +194,8 @@ Checkout requires a shipping address.
     \item \texttt{phone} --- optional string.
 \end{itemize}
 
+The same address shape is also used for invoice billing addresses.
+
 \subsection{Order Totals Shape}
 
 \begin{minted}[frame=single]{json}
@@ -162,7 +244,8 @@ Authorization: Bearer <accessToken>
 Content-Type: application/json
 \end{minted}
 
-\textbf{Request body:}
+\pagebreak
+\textbf{Minimal private purchase request body:}
 
 \begin{minted}[frame=single]{json}
 {
@@ -178,9 +261,68 @@ Content-Type: application/json
 }
 \end{minted}
 
+\textbf{Private purchase with invoice request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "purchaseType": "private",
+    "invoice": {
+        "requested": true,
+        "billingAddressSameAsShipping": true
+    },
+    "shippingAddress": {
+        "fullName": "Jan Kowalski",
+        "line1": "Example Street 12",
+        "city": "Warsaw",
+        "postalCode": "00-001",
+        "country": "Poland"
+    }
+}
+\end{minted}
+
+\pagebreak
+\textbf{Company purchase request body:}
+
+\begin{minted}[frame=single]{json}
+{
+    "purchaseType": "company",
+    "invoice": {
+        "requested": true,
+        "billingAddressSameAsShipping": false,
+        "billingAddress": {
+            "fullName": "ACME Sp. z o.o.",
+            "line1": "Business Street 1",
+            "city": "Warsaw",
+            "postalCode": "00-002",
+            "country": "Poland"
+        },
+        "companyDetails": {
+            "companyName": "ACME Sp. z o.o.",
+            "taxId": "1234567890"
+        }
+    },
+    "shippingAddress": {
+        "fullName": "Warehouse Receiver",
+        "line1": "Warehouse Street 5",
+        "city": "Warsaw",
+        "postalCode": "00-003",
+        "country": "Poland",
+        "phone": "+48123456789"
+    }
+}
+\end{minted}
+
 \textbf{Body fields:}
 
 \begin{itemize}
+    \item \texttt{purchaseType} --- optional enum: \texttt{private}, \texttt{company}. Defaults to \texttt{private}.
+    \item \texttt{invoice} --- optional object containing invoice request data.
+    \item \texttt{invoice.requested} --- optional boolean. Defaults to \texttt{false}.
+    \item \texttt{invoice.billingAddressSameAsShipping} --- optional boolean. Defaults to \texttt{true}.
+    \item \texttt{invoice.billingAddress} --- optional address object. Required when invoice is requested and billing address is not the same as shipping address.
+    \item \texttt{invoice.companyDetails} --- optional company details object. Required for company purchases.
+    \item \texttt{invoice.companyDetails.companyName} --- required string for company purchases.
+    \item \texttt{invoice.companyDetails.taxId} --- required string for company purchases.
     \item \texttt{shippingAddress} --- required object containing the shipping address.
     \item \texttt{shippingAddress.fullName} --- required string.
     \item \texttt{shippingAddress.line1} --- required string.
@@ -202,9 +344,13 @@ Content-Type: application/json
     \item The cart is cleared after successful checkout.
     \item The created order starts with status \texttt{pending\_payment}.
     \item Checkout also creates a pending mock payment.
+    \item Company purchases require invoice data and company details.
+    \item Private purchases cannot include company details.
+    \item Billing address may be copied from shipping address.
     \item The operation is transactional: order creation, payment creation, stock changes, and cart clearing are handled together.
 \end{itemize}
 
+\pagebreak
 \textbf{Example request:}
 
 \begin{minted}[frame=single]{http}
@@ -215,12 +361,27 @@ Content-Type: application/json
 
 \begin{minted}[frame=single]{json}
 {
+    "purchaseType": "company",
+    "invoice": {
+        "requested": true,
+        "billingAddressSameAsShipping": false,
+        "billingAddress": {
+            "fullName": "ACME Sp. z o.o.",
+            "line1": "Business Street 1",
+            "city": "Warsaw",
+            "postalCode": "00-002",
+            "country": "Poland"
+        },
+        "companyDetails": {
+            "companyName": "ACME Sp. z o.o.",
+            "taxId": "1234567890"
+        }
+    },
     "shippingAddress": {
-        "fullName": "Jan Kowalski",
-        "line1": "Example Street 12",
-        "line2": "Apartment 4",
+        "fullName": "Warehouse Receiver",
+        "line1": "Warehouse Street 5",
         "city": "Warsaw",
-        "postalCode": "00-001",
+        "postalCode": "00-003",
         "country": "Poland",
         "phone": "+48123456789"
     }
@@ -236,6 +397,22 @@ Content-Type: application/json
         "id": "665000000000000000000030",
         "userId": "665000000000000000000001",
         "status": "pending_payment",
+        "purchaseType": "company",
+        "invoice": {
+            "requested": true,
+            "billingAddressSameAsShipping": false,
+            "billingAddress": {
+                "fullName": "ACME Sp. z o.o.",
+                "line1": "Business Street 1",
+                "city": "Warsaw",
+                "postalCode": "00-002",
+                "country": "Poland"
+            },
+            "companyDetails": {
+                "companyName": "ACME Sp. z o.o.",
+                "taxId": "1234567890"
+            }
+        },
         "items": [
             {
                 "productId": "665000000000000000000010",
@@ -248,11 +425,10 @@ Content-Type: application/json
             }
         ],
         "shippingAddress": {
-            "fullName": "Jan Kowalski",
-            "line1": "Example Street 12",
-            "line2": "Apartment 4",
+            "fullName": "Warehouse Receiver",
+            "line1": "Warehouse Street 5",
             "city": "Warsaw",
-            "postalCode": "00-001",
+            "postalCode": "00-003",
             "country": "Poland",
             "phone": "+48123456789"
         },
@@ -317,6 +493,11 @@ Authorization: Bearer <accessToken>
         "id": "665000000000000000000030",
         "userId": "665000000000000000000001",
         "status": "pending_payment",
+        "purchaseType": "private",
+        "invoice": {
+            "requested": false,
+            "billingAddressSameAsShipping": true
+        },
         "items": [
             {
                 "productId": "665000000000000000000010",
@@ -381,6 +562,7 @@ GET /orders/665000000000000000000030
 Authorization: Bearer <accessToken>
 \end{minted}
 
+\pagebreak
 \textbf{Example success response:}
 
 \begin{minted}[frame=single]{json}
@@ -388,6 +570,11 @@ Authorization: Bearer <accessToken>
     "id": "665000000000000000000030",
     "userId": "665000000000000000000001",
     "status": "pending_payment",
+    "purchaseType": "private",
+    "invoice": {
+        "requested": false,
+        "billingAddressSameAsShipping": true
+    },
     "items": [
         {
             "productId": "665000000000000000000010",
