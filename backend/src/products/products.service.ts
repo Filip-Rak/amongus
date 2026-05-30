@@ -425,7 +425,7 @@ import {ProductStatus} from './types/product-status.enum';
 
 		for ( const definition of definitions )
 		{
-			if ( definition.required && attributeValues[ definition.key ] === undefined )
+			if ( definition.isRequired && attributeValues[ definition.key ] === undefined )
 			{
 				throw new BadRequestException(
 				    `Missing required attribute "${definition.key}"`,

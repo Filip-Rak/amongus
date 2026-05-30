@@ -7,7 +7,7 @@ export interface CategoryAttributeDefinition {
 	key: string;
 	label: string;
 	type: CategoryAttributeType;
-	required: boolean;
+	isRequired: boolean;
 	allowedValues?: string[];
 	min?: number;
 	max?: number;

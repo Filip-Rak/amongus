@@ -41,7 +41,7 @@ export class CategoryAttributeDefinitionDto
 
 	@IsEnum( CategoryAttributeType ) type: CategoryAttributeType;
 
-	@IsBoolean() required: boolean;
+	@IsBoolean() isRequired: boolean;
 
 	@IsOptional()
 	@IsArray()

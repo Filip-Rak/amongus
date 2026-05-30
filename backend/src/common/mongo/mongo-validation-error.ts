@@ -60,10 +60,14 @@ export function getMongoValidationMessages( error: MongoServerError ): string[]
 	return messages.length > 0 ? messages : [ 'Document failed database validation' ];
 }
 
-function extractMessagesFromRule( rule: UnknownRecord, path = '' ): string[]
+function extractMessagesFromRule(
+    rule: UnknownRecord,
+    path = '',
+    ): string[]
 {
 	const messages: string[] = [];
-	const operatorName       = asString( rule.operatorName );
+
+	const operatorName = asString( rule.operatorName );
 
 	if ( operatorName === 'required' )
 	{
@@ -75,22 +79,15 @@ function extractMessagesFromRule( rule: UnknownRecord, path = '' ): string[]
 		messages.push( ...extractPropertyMessages( rule, path ) );
 	}
 
-	if ( operatorName !== undefined && operatorName !== 'required' && operatorName !== 'properties' )
+	if ( operatorName === 'items' )
 	{
-		const reason          = asString( rule.reason );
-		const specifiedAs     = rule.specifiedAs;
-		const consideredValue = rule.consideredValue;
+		messages.push( ...extractItemsMessages( rule, path ) );
+	}
 
-		messages.push(
-		    [
-			    path || 'document',
-			    `failed "${operatorName}" validation`,
-				reason ? `reason: ${reason}` : undefined,
-				specifiedAs !== undefined ? `specifiedAs: ${JSON.stringify( specifiedAs )}` : undefined,
-				consideredValue !== undefined ? `consideredValue: ${JSON.stringify( consideredValue )}` : undefined,
-			].filter( Boolean )
-				.join( '; ' ),
-		);
+	if ( operatorName !== undefined && operatorName !== 'required' && operatorName !== 'properties' &&
+	     operatorName !== 'items' )
+	{
+		messages.push( formatRuleFailure( rule, path, operatorName ) );
 	}
 
 	for ( const nestedRule of asRecordArray( rule.schemaRulesNotSatisfied ) )
@@ -101,7 +98,10 @@ function extractMessagesFromRule( rule: UnknownRecord, path = '' ): string[]
 	return messages;
 }
 
-function extractRequiredMessages( rule: UnknownRecord, path: string ): string[]
+function extractRequiredMessages(
+    rule: UnknownRecord,
+    path: string,
+    ): string[]
 {
 	if ( !Array.isArray( rule.missingProperties ) )
 	{
@@ -112,7 +112,10 @@ function extractRequiredMessages( rule: UnknownRecord, path: string ): string[]
 	    .map( ( property ) => `${joinPath( path, property )} is required` );
 }
 
-function extractPropertyMessages( rule: UnknownRecord, path: string ): string[]
+function extractPropertyMessages(
+    rule: UnknownRecord,
+    path: string,
+    ): string[]
 {
 	const messages: string[] = [];
 
@@ -131,13 +134,110 @@ function extractPropertyMessages( rule: UnknownRecord, path: string ): string[]
 			messages.push( ...extractMessagesFromRule( nestedRule, propertyPath ) );
 		}
 
-		if ( !Array.isArray( propertyRule.details ) && !Array.isArray( propertyRule.schemaRulesNotSatisfied ) )
+		for ( const nestedRule of asRecordArray( propertyRule.propertiesNotSatisfied ) )
+		{
+			messages.push( ...extractPropertyMessages(
+			    {
+				    operatorName : 'properties',
+				    propertiesNotSatisfied : [ nestedRule ],
+			    },
+			    propertyPath,
+			    ) );
+		}
+
+		for ( const nestedRule of asRecordArray( propertyRule.itemsNotSatisfied ) )
+		{
+			messages.push( ...extractItemsMessages(
+			    {
+				    operatorName : 'items',
+				    itemsNotSatisfied : [ nestedRule ],
+			    },
+			    propertyPath,
+			    ) );
+		}
+
+		if ( messages.length === 0 )
 		{
 			messages.push( `${propertyPath || 'document'} failed validation` );
 		}
 	}
 
 	return messages;
+}
+
+function extractItemsMessages(
+    rule: UnknownRecord,
+    path: string,
+    ): string[]
+{
+	const messages: string[] = [];
+
+	for ( const itemRule of asRecordArray( rule.itemsNotSatisfied ) )
+	{
+		const itemIndex = getItemIndex( itemRule );
+		const itemPath  = itemIndex === undefined ? `${path}[]` : `${path}[${itemIndex}]`;
+
+		for ( const detail of asRecordArray( itemRule.details ) )
+		{
+			messages.push( ...extractMessagesFromRule( detail, itemPath ) );
+		}
+
+		for ( const nestedRule of asRecordArray( itemRule.schemaRulesNotSatisfied ) )
+		{
+			messages.push( ...extractMessagesFromRule( nestedRule, itemPath ) );
+		}
+
+		for ( const nestedRule of asRecordArray( itemRule.propertiesNotSatisfied ) )
+		{
+			messages.push( ...extractPropertyMessages(
+			    {
+				    operatorName : 'properties',
+				    propertiesNotSatisfied : [ nestedRule ],
+			    },
+			    itemPath,
+			    ) );
+		}
+
+		if ( !Array.isArray( itemRule.details ) && !Array.isArray( itemRule.schemaRulesNotSatisfied ) &&
+		     !Array.isArray( itemRule.propertiesNotSatisfied ) )
+		{
+			messages.push( `${itemPath} failed validation` );
+		}
+	}
+
+	return messages;
+}
+
+function getItemIndex( rule: UnknownRecord ): number|undefined
+{
+	const index = rule.itemIndex ?? rule.index;
+
+	if ( typeof index === 'number' )
+	{
+		return index;
+	}
+
+	return undefined;
+}
+
+function formatRuleFailure(
+    rule: UnknownRecord,
+    path: string,
+    operatorName: string,
+    ): string
+{
+	const reason          = asString( rule.reason );
+	const specifiedAs     = rule.specifiedAs;
+	const consideredValue = rule.consideredValue;
+
+	return [
+		path || 'document',
+		`failed "${operatorName}" validation`,
+		reason ? `reason: ${reason}` : undefined,
+		specifiedAs !== undefined ? `specifiedAs: ${JSON.stringify( specifiedAs )}` : undefined,
+		consideredValue !== undefined ? `consideredValue: ${JSON.stringify( consideredValue )}` : undefined,
+	].filter( Boolean )
+		.join( '; ' );
 }
 
 function joinPath( parent: string, child: string ): string

@@ -83,7 +83,7 @@ export const categoryValidator: CollectionValidatorDefinition = {
 							'key',
 							'label',
 							'type',
-							'required',
+							'isRequired',
 						],
 						properties : {
 							key : {
@@ -108,9 +108,9 @@ export const categoryValidator: CollectionValidatorDefinition = {
 								],
 								description : 'attribute type must be supported',
 							},
-							required : {
+							isRequired : {
 								bsonType : 'bool',
-								description : 'required must be a boolean',
+								description : 'isRequired must be a boolean',
 							},
 							allowedValues : {
 								bsonType : 'array',
