@@ -764,6 +764,3 @@ DELETE {{baseUrl}}/reviews/{{reviewId}}
 # Admin
 DELETE {{baseUrl}}/reviews/admin/{{adminReviewId}}
 {{auth}}
-
-# TODO: 
-# Final cleanup.
