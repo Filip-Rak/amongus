@@ -1,0 +1,82 @@
+\section{Health Endpoints}
+
+Health endpoints are public utility endpoints used to check whether the backend application and database connection are available.
+
+These endpoints do not require authentication.
+
+\subsection{\texttt{GET /health}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Checks whether the backend application is running.
+
+\textbf{Request body:} None.
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /health
+\end{minted}
+
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "status": "ok",
+    "timestamp": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\textbf{Response fields:}
+
+\begin{itemize}
+    \item \texttt{status} --- application status. Returns \texttt{ok} when the backend is running.
+    \item \texttt{timestamp} --- ISO timestamp generated when the health check response is created.
+\end{itemize}
+
+\subsection{\texttt{GET /health/db}}
+
+\textbf{Access:} Public
+
+\textbf{Description:} Checks whether the backend can reach the configured MongoDB database.
+
+\textbf{Request body:} None.
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /health/db
+\end{minted}
+
+\textbf{Example success response when connected:}
+
+\begin{minted}[frame=single]{json}
+{
+    "database": "connected",
+    "timestamp": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\pagebreak
+\textbf{Example response when disconnected:}
+
+\begin{minted}[frame=single]{json}
+{
+    "database": "disconnected",
+    "timestamp": "2026-05-30T10:00:00.000Z"
+}
+\end{minted}
+
+\textbf{Response fields:}
+
+\begin{itemize}
+    \item \texttt{database} --- database connection status. Possible values: \texttt{connected}, \texttt{disconnected}.
+    \item \texttt{timestamp} --- ISO timestamp generated when the database health check response is created.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item This endpoint checks the database connection using a database ping.
+    \item The endpoint is public so it can be used by simple monitoring tools or manual development checks.
+\end{itemize}
