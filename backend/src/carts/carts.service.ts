@@ -1,6 +1,8 @@
+import {isMongoDocumentValidationError} from '@/common/mongo/mongo-errors';
+import {getMongoValidationMessages} from '@/common/mongo/mongo-validation-error';
 import {ProductsRepository} from '@/products/products.repository';
 import {ProductRecord} from '@/products/types/product-document.type';
-import {ConflictException, Injectable, NotFoundException} from '@nestjs/common';
+import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
 
 import {CartsRepository} from './carts.repository';
@@ -31,12 +33,21 @@ import {CartRecord} from './types/cart-document.type';
 	{
 		const productId = new ObjectId( dto.productId );
 
-		await this.assertProductCanBeAddedToCart( productId, dto.quantity );
+		const existingCart = await this.cartsRepository.findByUserId( userId );
 
-		const cart = await this.cartsRepository.addItem(
-		    userId,
-		    productId,
-		    dto.quantity,
+		const existingQuantity =
+		    existingCart?.items.find( ( item ) => item.productId.equals( productId ) )?.quantity ?? 0;
+
+		const requestedFinalQuantity = existingQuantity + dto.quantity;
+
+		await this.assertProductCanBeAddedToCart( productId, requestedFinalQuantity );
+
+		const cart = await this.withCartWriteErrorHandling(
+		    async () => this.cartsRepository.addItem(
+		        userId,
+		        productId,
+		        dto.quantity,
+		        ),
 		);
 
 		return this.toResponseDto( userId, cart );
@@ -50,23 +61,31 @@ import {CartRecord} from './types/cart-document.type';
 	{
 		await this.assertProductCanBeAddedToCart( productId, dto.quantity );
 
-		const cart = await this.cartsRepository.setItemQuantity(
-		    userId,
-		    productId,
-		    dto.quantity,
+		const cart = await this.withCartWriteErrorHandling(
+		    async () => this.cartsRepository.setItemQuantity(
+		        userId,
+		        productId,
+		        dto.quantity,
+		        ),
 		);
+
+		if ( !cart )
+		{
+			throw new NotFoundException( 'Cart item not found' );
+		}
 
 		return this.toResponseDto( userId, cart );
 	}
 
 	async removeItem( userId: ObjectId, productId: ObjectId ): Promise< void >
 	{
-		await this.cartsRepository.removeItem( userId, productId );
+		await this.withCartWriteErrorHandling(
+		    async () => { await this.cartsRepository.removeItem( userId, productId ); } );
 	}
 
 	async clear( userId: ObjectId ): Promise< void >
 	{
-		await this.cartsRepository.clear( userId );
+		await this.withCartWriteErrorHandling( async () => { await this.cartsRepository.clear( userId ); } );
 	}
 
 	private async assertProductCanBeAddedToCart(
@@ -89,6 +108,28 @@ import {CartRecord} from './types/cart-document.type';
 		if ( quantity > product.stock )
 		{
 			throw new ConflictException( 'Requested quantity exceeds available stock' );
+		}
+	}
+
+	private async withCartWriteErrorHandling< T >(
+	    operation: () => Promise< T >,
+	    ): Promise< T >
+	{
+		try
+		{
+			return await operation();
+		}
+		catch ( error )
+		{
+			if ( isMongoDocumentValidationError( error ) )
+			{
+				throw new BadRequestException( {
+					message : 'Cart failed database validation',
+					validationErrors : getMongoValidationMessages( error ),
+				} );
+			}
+
+			throw error;
 		}
 	}
 

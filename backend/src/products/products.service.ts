@@ -2,7 +2,9 @@ import {CategoriesRepository} from '@/categories/categories.repository';
 import {CategoriesService} from '@/categories/categories.service';
 import {CategoryAttributeType} from '@/categories/types/category-attribute-type.enum';
 import {CategoryAttributeDefinition} from '@/categories/types/category-document.type';
-import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {isMongoDocumentValidationError, isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {getMongoValidationMessages} from '@/common/mongo/mongo-validation-error';
+import {omitUndefined} from '@/common/utils/object.utils';
 import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
 
@@ -32,7 +34,7 @@ import {ProductStatus} from './types/product-status.enum';
 
 		const input = await this.buildCreateInput( dto );
 
-		return this.withDuplicateSlugHandling( async () => {
+		return this.withProductWriteErrorHandling( async () => {
 			const product = await this.productsRepository.create( input );
 
 			return this.toResponseDto( product );
@@ -109,14 +111,9 @@ import {ProductStatus} from './types/product-status.enum';
 
 		const updateInput = await this.buildUpdateInput( existingProduct, dto );
 
-		if ( Object.keys( updateInput ).length === 0 )
-		{
-			throw new BadRequestException( 'At least one field must be provided' );
-		}
+		this.assertUpdateIsNotEmpty( updateInput );
 
-		await this.findOneAdmin( id );
-
-		return this.withDuplicateSlugHandling( async () => {
+		return this.withProductWriteErrorHandling( async () => {
 			const updatedProduct = await this.productsRepository.updateById(
 			    id,
 			    updateInput,
@@ -147,12 +144,14 @@ import {ProductStatus} from './types/product-status.enum';
 			return;
 		}
 
-		const archived = await this.productsRepository.archiveById( id );
+		await this.withProductWriteErrorHandling( async () => {
+			const archived = await this.productsRepository.archiveById( id );
 
-		if ( !archived )
-		{
-			throw new NotFoundException( 'Product not found' );
-		}
+			if ( !archived )
+			{
+				throw new NotFoundException( 'Product not found' );
+			}
+		} );
 	}
 
 	private async findMany(
@@ -234,7 +233,7 @@ import {ProductStatus} from './types/product-status.enum';
 		    effectiveAttributeValues,
 		);
 
-		return this.omitUndefined( {
+		return omitUndefined( {
 			name : dto.name,
 			slug : dto.slug === undefined ? undefined : this.normalizeSlug( dto.slug ),
 			description : dto.description,
@@ -272,26 +271,6 @@ import {ProductStatus} from './types/product-status.enum';
 		                   } ) );
 	}
 
-	private assertValidAttributes(
-	    attributes: Record< string, ProductAttributeValue >,
-	    ): void
-	{
-		for ( const [ key, value ] of Object.entries( attributes ) )
-		{
-			if ( !key.trim() )
-			{
-				throw new BadRequestException( 'Product attribute key cannot be empty' );
-			}
-
-			if ( !this.isValidAttributeValue( value ) )
-			{
-				throw new BadRequestException(
-				    `Invalid value for product attribute "${key}"`,
-				);
-			}
-		}
-	}
-
 	private isValidAttributeValue( value: unknown ): value is ProductAttributeValue
 	{
 		if ( typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' )
@@ -312,6 +291,14 @@ import {ProductStatus} from './types/product-status.enum';
 		if ( query.minPrice !== undefined && query.maxPrice !== undefined && query.minPrice > query.maxPrice )
 		{
 			throw new BadRequestException( 'minPrice cannot be greater than maxPrice' );
+		}
+	}
+
+	private assertUpdateIsNotEmpty( updateInput: object ): void
+	{
+		if ( Object.keys( updateInput ).length === 0 )
+		{
+			throw new BadRequestException( 'At least one field must be provided' );
 		}
 	}
 
@@ -338,7 +325,7 @@ import {ProductStatus} from './types/product-status.enum';
 		return slug;
 	}
 
-	private async withDuplicateSlugHandling< T >(
+	private async withProductWriteErrorHandling< T >(
 	    operation: () => Promise< T >,
 	    ): Promise< T >
 	{
@@ -353,6 +340,14 @@ import {ProductStatus} from './types/product-status.enum';
 				throw new ConflictException( 'Product slug is already in use' );
 			}
 
+			if ( isMongoDocumentValidationError( error ) )
+			{
+				throw new BadRequestException( {
+					message : 'Product failed database validation',
+					validationErrors : getMongoValidationMessages( error ),
+				} );
+			}
+
 			throw error;
 		}
 	}
@@ -361,23 +356,14 @@ import {ProductStatus} from './types/product-status.enum';
 	{
 		const { _id, categoryId, createdAt, updatedAt, archivedAt, ...productData } = product;
 
-		return {
-			id : _id.toHexString(),
-			...productData,
-			categoryId : categoryId.toHexString(),
-			createdAt : createdAt.toISOString(),
-			updatedAt : updatedAt.toISOString(),
-			...( archivedAt && {
-				archivedAt : archivedAt.toISOString(),
-			} ),
-		};
-	}
-
-	private omitUndefined< T extends object >( object: T ): Partial< T >
-	{
-		return Object.fromEntries(
-		           Object.entries( object ).filter( ( [, value ] ) => value !== undefined ),
-		           ) as Partial< T >;
+		return omitUndefined( {
+			       id : _id.toHexString(),
+			       ...productData,
+			       categoryId : categoryId.toHexString(),
+			       createdAt : createdAt.toISOString(),
+			       updatedAt : updatedAt.toISOString(),
+			       archivedAt : archivedAt?.toISOString(),
+		       } ) as ProductResponseDto;
 	}
 
 	private async resolveActiveCategoryId( categoryId: string ): Promise< ObjectId >

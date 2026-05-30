@@ -157,7 +157,7 @@ DELETE {{baseUrl}}/users/me
 # CATEGORIES
 # =========================
 
-@categoryId = 6a05823ac121e211cbb9445c
+@categoryId = 6a1aa761a1e1ddff840cb33f
 @parentCategoryId = 6a05823ac121e211cbb9445b
 @categorySlug = keyboards
 

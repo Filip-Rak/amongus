@@ -1,4 +1,6 @@
-import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {isMongoDocumentValidationError, isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {getMongoValidationMessages} from '@/common/mongo/mongo-validation-error';
+import {omitUndefined} from '@/common/utils/object.utils';
 import {DatabaseService} from '@/database/database.service';
 import {OrdersRepository} from '@/orders/orders.repository';
 import {ProductsRepository} from '@/products/products.repository';
@@ -64,53 +66,53 @@ import {ReviewRecord} from './types/review-document.type';
 	    dto: CreateReviewDto,
 	    ): Promise< ReviewResponseDto >
 	{
-		return this.databaseService.withTransaction( async ( session ) => {
-			const product = await this.productsRepository.findActiveById( productId, {
-				session,
-			} );
-
-			if ( !product )
-			{
-				throw new NotFoundException( 'Product not found' );
-			}
-
-			const order = await this.ordersRepository.findPaidOrderContainingProduct(
-			    userId,
-			    productId,
-			    {
+		return this.withReviewWriteErrorHandling(
+		    async () => this.databaseService.withTransaction( async ( session ) => {
+			    const product = await this.productsRepository.findActiveById( productId, {
 				    session,
-			    },
-			);
+			    } );
 
-			if ( !order )
-			{
-				throw new ForbiddenException(
-				    'You can review only products you have bought and paid for',
-				);
-			}
+			    if ( !product )
+			    {
+				    throw new NotFoundException( 'Product not found' );
+			    }
 
-			return this.withDuplicateReviewHandling( async () => {
-				const review = await this.reviewsRepository.create(
-				    {
-					    productId,
-					    userId,
-					    orderId : order._id,
-					    rating : dto.rating,
-					    title : dto.title,
-					    comment : dto.comment,
-				    },
-				    {
-					    session,
-				    },
-				);
+			    const order = await this.ordersRepository.findPaidOrderContainingProduct(
+			        userId,
+			        productId,
+			        {
+				        session,
+			        },
+			    );
 
-				await this.refreshProductReviewStats( productId, {
-					session,
-				} );
+			    if ( !order )
+			    {
+				    throw new ForbiddenException(
+				        'You can review only products you have bought and paid for',
+				    );
+			    }
 
-				return this.toResponseDto( review );
-			} );
-		} );
+			    const review = await this.reviewsRepository.create(
+			        {
+				        productId,
+				        userId,
+				        orderId : order._id,
+				        rating : dto.rating,
+				        title : dto.title,
+				        comment : dto.comment,
+			        },
+			        {
+				        session,
+			        },
+			    );
+
+			    await this.refreshProductReviewStats( productId, {
+				    session,
+			    } );
+
+			    return this.toResponseDto( review );
+		    } ),
+		);
 	}
 
 	async updateMine(
@@ -123,60 +125,66 @@ import {ReviewRecord} from './types/review-document.type';
 
 		this.assertUpdateIsNotEmpty( updateInput );
 
-		return this.databaseService.withTransaction( async ( session ) => {
-			const review = await this.getReviewOrThrow( reviewId, {
-				session,
-			} );
-
-			this.assertReviewOwner( review, userId );
-
-			const updatedReview = await this.reviewsRepository.updateById(
-			    reviewId,
-			    updateInput,
-			    {
+		return this.withReviewWriteErrorHandling(
+		    async () => this.databaseService.withTransaction( async ( session ) => {
+			    const review = await this.getReviewOrThrow( reviewId, {
 				    session,
-			    },
-			);
+			    } );
 
-			if ( !updatedReview )
-			{
-				throw new NotFoundException( 'Review not found' );
-			}
+			    this.assertReviewOwner( review, userId );
 
-			await this.refreshProductReviewStats( review.productId, {
-				session,
-			} );
+			    const updatedReview = await this.reviewsRepository.updateById(
+			        reviewId,
+			        updateInput,
+			        {
+				        session,
+			        },
+			    );
 
-			return this.toResponseDto( updatedReview );
-		} );
+			    if ( !updatedReview )
+			    {
+				    throw new NotFoundException( 'Review not found' );
+			    }
+
+			    await this.refreshProductReviewStats( review.productId, {
+				    session,
+			    } );
+
+			    return this.toResponseDto( updatedReview );
+		    } ),
+		);
 	}
 
 	async removeMine( userId: ObjectId, reviewId: ObjectId ): Promise< void >
 	{
-		await this.databaseService.withTransaction( async ( session ) => {
-			const review = await this.getReviewOrThrow( reviewId, {
-				session,
-			} );
+		await this.withReviewWriteErrorHandling(
+		    async () => this.databaseService.withTransaction( async ( session ) => {
+			    const review = await this.getReviewOrThrow( reviewId, {
+				    session,
+			    } );
 
-			this.assertReviewOwner( review, userId );
+			    this.assertReviewOwner( review, userId );
 
-			await this.softDeleteAndRefreshStats( review, {
-				session,
-			} );
-		} );
+			    await this.softDeleteAndRefreshStats( review, {
+				    session,
+			    } );
+		    } ),
+		);
 	}
 
 	async removeAsAdmin( reviewId: ObjectId ): Promise< void >
 	{
-		await this.databaseService.withTransaction( async ( session ) => {
-			const review = await this.getReviewOrThrow( reviewId, {
-				session,
-			} );
+		await this.withReviewWriteErrorHandling(
+		    async () => this.databaseService.withTransaction( async ( session ) => {
+			    const review = await this.getReviewOrThrow( reviewId, {
+				    session,
+			    } );
 
-			await this.softDeleteAndRefreshStats( review, {
-				session,
-			} );
-		} );
+			    await this.softDeleteAndRefreshStats( review, {
+				    session,
+			    } );
+		    } ),
+		);
 	}
 
 	private async getReviewOrThrow(
@@ -239,7 +247,7 @@ import {ReviewRecord} from './types/review-document.type';
 
 	private buildUpdateInput( dto: UpdateReviewDto ): UpdateReviewInput
 	{
-		return this.omitUndefined( {
+		return omitUndefined( {
 			rating : dto.rating,
 			title : dto.title,
 			comment : dto.comment,
@@ -254,7 +262,7 @@ import {ReviewRecord} from './types/review-document.type';
 		}
 	}
 
-	private async withDuplicateReviewHandling< T >(
+	private async withReviewWriteErrorHandling< T >(
 	    operation: () => Promise< T >,
 	    ): Promise< T >
 	{
@@ -267,6 +275,14 @@ import {ReviewRecord} from './types/review-document.type';
 			if ( isMongoDuplicateKeyError( error ) )
 			{
 				throw new ConflictException( 'You have already reviewed this product' );
+			}
+
+			if ( isMongoDocumentValidationError( error ) )
+			{
+				throw new BadRequestException( {
+					message : 'Review failed database validation',
+					validationErrors : getMongoValidationMessages( error ),
+				} );
 			}
 
 			throw error;
@@ -289,12 +305,5 @@ import {ReviewRecord} from './types/review-document.type';
 				deletedAt : deletedAt.toISOString(),
 			} ),
 		};
-	}
-
-	private omitUndefined< T extends object >( object: T ): Partial< T >
-	{
-		return Object.fromEntries(
-		           Object.entries( object ).filter( ( [, value ] ) => value !== undefined ),
-		           ) as Partial< T >;
 	}
 }

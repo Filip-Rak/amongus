@@ -1,7 +1,8 @@
 import {isMongoDocumentValidationError, isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {getMongoValidationMessages} from '@/common/mongo/mongo-validation-error';
+import {omitUndefined} from '@/common/utils/object.utils';
 import {CATEGORY_MAX_DEPTH} from '@/common/validation/validation-limits';
 import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
-import {getMongoValidationMessages} from 'common/mongo/mongo-validation-error';
 import {ObjectId} from 'mongodb';
 
 import {CategoriesRepository, CreateCategoryInput, UpdateCategoryInput} from './categories.repository';
@@ -232,12 +233,14 @@ import {CategoryStatus} from './types/category-status.enum';
 			return;
 		}
 
-		const archived = await this.categoriesRepository.archiveById( id );
+		await this.withCategoryWriteErrorHandling( async () => {
+			const archived = await this.categoriesRepository.archiveById( id );
 
-		if ( !archived )
-		{
-			throw new NotFoundException( 'Category not found' );
-		}
+			if ( !archived )
+			{
+				throw new NotFoundException( 'Category not found' );
+			}
+		} );
 	}
 
 	private async findMany(
@@ -288,16 +291,16 @@ import {CategoryStatus} from './types/category-status.enum';
 			);
 		}
 
-		return {
-			name : dto.name,
-			slug : dto.slug ? this.normalizeSlug( dto.slug ) : this.slugify( dto.name ),
-			parentId : parent?._id,
-			ancestorIds : parent ? [...parent.ancestorIds, parent._id ] : [],
-			level : parent ? parent.level + 1 : 0,
-			description : dto.description,
-			status : dto.status ?? CategoryStatus.Active,
-			attributeDefinitions,
-		};
+		return omitUndefined( {
+			       name : dto.name,
+			       slug : dto.slug ? this.normalizeSlug( dto.slug ) : this.slugify( dto.name ),
+			       parentId : parent?._id,
+			       ancestorIds : parent ? [...parent.ancestorIds, parent._id ] : [],
+			       level : parent ? parent.level + 1 : 0,
+			       description : dto.description,
+			       status : dto.status ?? CategoryStatus.Active,
+			       attributeDefinitions,
+		       } ) as CreateCategoryInput;
 	}
 
 	private async buildUpdateInput(
@@ -333,7 +336,7 @@ import {CategoryStatus} from './types/category-status.enum';
 			}
 		}
 
-		return this.omitUndefined( {
+		return omitUndefined( {
 			name : dto.name,
 			slug : dto.slug === undefined ? undefined : this.normalizeSlug( dto.slug ),
 			description : dto.description,
@@ -550,25 +553,14 @@ import {CategoryStatus} from './types/category-status.enum';
 	{
 		const { _id, parentId, ancestorIds, createdAt, updatedAt, archivedAt, ...categoryData } = category;
 
-		return {
-			id : _id.toHexString(),
-			...categoryData,
-			...( parentId && {
-				parentId : parentId.toHexString(),
-			} ),
-			ancestorIds : ancestorIds.map( ( ancestorId ) => ancestorId.toHexString() ),
-			createdAt : createdAt.toISOString(),
-			updatedAt : updatedAt.toISOString(),
-			...( archivedAt && {
-				archivedAt : archivedAt.toISOString(),
-			} ),
-		};
-	}
-
-	private omitUndefined< T extends object >( object: T ): Partial< T >
-	{
-		return Object.fromEntries(
-		           Object.entries( object ).filter( ( [, value ] ) => value !== undefined ),
-		           ) as Partial< T >;
+		return omitUndefined( {
+			       id : _id.toHexString(),
+			       ...categoryData,
+			       parentId : parentId?.toHexString(),
+			       ancestorIds : ancestorIds.map( ( ancestorId ) => ancestorId.toHexString() ),
+			       createdAt : createdAt.toISOString(),
+			       updatedAt : updatedAt.toISOString(),
+			       archivedAt : archivedAt?.toISOString(),
+		       } ) as CategoryResponseDto;
 	}
 }

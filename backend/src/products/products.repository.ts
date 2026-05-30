@@ -1,4 +1,5 @@
 import {RepositoryOptions} from '@/common/types/repository-options.type';
+import {omitUndefined} from '@/common/utils/object.utils';
 import {DatabaseService} from '@/database/database.service';
 import {Injectable, OnModuleInit} from '@nestjs/common';
 import {Collection, Filter, ObjectId, Sort, UpdateFilter} from 'mongodb';
@@ -212,7 +213,7 @@ type ProductFindFilter = Filter< ProductDocument >&
 	{
 		const now = new Date();
 
-		const $set = this.omitUndefined( {
+		const $set = omitUndefined( {
 			...input,
 			updatedAt : now,
 			archivedAt : input.status === ProductStatus.Archived ? now : undefined,
@@ -418,12 +419,5 @@ type ProductFindFilter = Filter< ProductDocument >&
 		return {
 			createdAt : -1,
 		};
-	}
-
-	private omitUndefined< T extends Record< string, unknown >>( object: T ): Partial< T >
-	{
-		return Object.fromEntries(
-		           Object.entries( object ).filter( ( [, value ] ) => value !== undefined ),
-		           ) as Partial< T >;
 	}
 }

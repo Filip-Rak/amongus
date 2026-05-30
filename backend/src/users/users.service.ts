@@ -1,4 +1,6 @@
-import {isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {isMongoDocumentValidationError, isMongoDuplicateKeyError} from '@/common/mongo/mongo-errors';
+import {getMongoValidationMessages} from '@/common/mongo/mongo-validation-error';
+import {omitUndefined} from '@/common/utils/object.utils';
 import {
 	BadRequestException,
 	ConflictException,
@@ -43,6 +45,11 @@ type AdminUpdateInput = CredentialUpdateInput&
 	status?: UserStatus;
 };
 
+type UpdateMeDtoWithCurrentPassword = UpdateMeDto&
+{
+	currentPassword: string;
+};
+
 @Injectable() export class UsersService
 {
 	constructor(
@@ -53,7 +60,7 @@ type AdminUpdateInput = CredentialUpdateInput&
 
 	async create( dto: CreateUserDto ): Promise< UserResponseDto >
 	{
-		return this.withDuplicateEmailHandling( async () => {
+		return this.withUserWriteErrorHandling( async () => {
 			const passwordHash = await this.passwordService.hashPassword( dto.password );
 
 			const user = await this.usersRepository.create( {
@@ -111,7 +118,7 @@ type AdminUpdateInput = CredentialUpdateInput&
 
 		await this.ensureActiveAdminWouldRemainAfter( existingUser, updateInput );
 
-		return this.withDuplicateEmailHandling( async () => {
+		return this.withUserWriteErrorHandling( async () => {
 			const updatedUser = await this.usersRepository.updateById( id, updateInput );
 
 			if ( !updatedUser )
@@ -132,9 +139,9 @@ type AdminUpdateInput = CredentialUpdateInput&
 
 		const user = await this.getActiveUserOrThrow( id );
 
-		await this.assertCurrentPasswordMatches( dto.currentPassword ?? "", user.passwordHash );
+		await this.assertCurrentPasswordMatches( dto.currentPassword, user.passwordHash );
 
-		return this.withDuplicateEmailHandling( async () => {
+		return this.withUserWriteErrorHandling( async () => {
 			const updatedUser = await this.usersRepository.updateById( id, updateInput );
 
 			if ( !updatedUser )
@@ -154,12 +161,14 @@ type AdminUpdateInput = CredentialUpdateInput&
 			status : UserStatus.Deleted,
 		} );
 
-		const deleted = await this.usersRepository.softDeleteById( id );
+		await this.withUserWriteErrorHandling( async () => {
+			const deleted = await this.usersRepository.softDeleteById( id );
 
-		if ( !deleted )
-		{
-			throw new NotFoundException( 'User not found' );
-		}
+			if ( !deleted )
+			{
+				throw new NotFoundException( 'User not found' );
+			}
+		} );
 	}
 
 	async removeMe( id: ObjectId ): Promise< void >
@@ -171,12 +180,14 @@ type AdminUpdateInput = CredentialUpdateInput&
 			throw new ForbiddenException( 'Only regular users can deactivate their own account' );
 		}
 
-		const deleted = await this.usersRepository.softDeleteById( id );
+		await this.withUserWriteErrorHandling( async () => {
+			const deleted = await this.usersRepository.softDeleteById( id );
 
-		if ( !deleted )
-		{
-			throw new NotFoundException( 'User not found' );
-		}
+			if ( !deleted )
+			{
+				throw new NotFoundException( 'User not found' );
+			}
+		} );
 	}
 
 	async findByEmailForAuth( email: string ): Promise< UserRecord|null >
@@ -212,7 +223,7 @@ type AdminUpdateInput = CredentialUpdateInput&
 	{
 		const credentialUpdateInput = await this.buildCredentialUpdateInput( dto );
 
-		return this.omitUndefined( {
+		return omitUndefined( {
 			...credentialUpdateInput,
 			role : dto.role,
 			status : dto.status,
@@ -226,7 +237,7 @@ type AdminUpdateInput = CredentialUpdateInput&
 		const passwordHash =
 		    dto.password === undefined ? undefined : await this.passwordService.hashPassword( dto.password );
 
-		return this.omitUndefined( {
+		return omitUndefined( {
 			email : dto.email,
 			passwordHash,
 		} );
@@ -240,7 +251,9 @@ type AdminUpdateInput = CredentialUpdateInput&
 		}
 	}
 
-	private assertCurrentPasswordProvided( dto: UpdateMeDto ): void
+	private assertCurrentPasswordProvided(
+	    dto: UpdateMeDto,
+	    ): asserts dto is UpdateMeDtoWithCurrentPassword
 	{
 		if ( !dto.currentPassword )
 		{
@@ -296,7 +309,7 @@ type AdminUpdateInput = CredentialUpdateInput&
 		}
 	}
 
-	private async withDuplicateEmailHandling< T >(
+	private async withUserWriteErrorHandling< T >(
 	    operation: () => Promise< T >,
 	    ): Promise< T >
 	{
@@ -309,6 +322,14 @@ type AdminUpdateInput = CredentialUpdateInput&
 			if ( isMongoDuplicateKeyError( error ) )
 			{
 				throw new ConflictException( 'Email is already in use' );
+			}
+
+			if ( isMongoDocumentValidationError( error ) )
+			{
+				throw new BadRequestException( {
+					message : 'User failed database validation',
+					validationErrors : getMongoValidationMessages( error ),
+				} );
 			}
 
 			throw error;
@@ -324,14 +345,9 @@ type AdminUpdateInput = CredentialUpdateInput&
 			status : user.status,
 			createdAt : user.createdAt.toISOString(),
 			updatedAt : user.updatedAt.toISOString(),
-			deletedAt : user.deletedAt?.toISOString(),
+			...( user.deletedAt && {
+				deletedAt : user.deletedAt.toISOString(),
+			} ),
 		};
-	}
-
-	private omitUndefined< T extends object >( object: T ): Partial< T >
-	{
-		return Object.fromEntries(
-		           Object.entries( object ).filter( ( [, value ] ) => value !== undefined ),
-		           ) as Partial< T >;
 	}
 }
