@@ -6,14 +6,67 @@ import {
 	ADDRESS_LINE_MAX_LENGTH,
 	ADDRESS_PHONE_MAX_LENGTH,
 	ADDRESS_POSTAL_CODE_MAX_LENGTH,
-	CART_ITEM_MIN_QUANTITY,
-	PRICE_MIN_AMOUNT,
-	PRODUCT_NAME_MAX_LENGTH,
-	PRODUCT_SLUG_MAX_LENGTH,
-	TEXT_MIN_LENGTH,
+	COMPANY_NAME_MAX_LENGTH,
+	COMPANY_TAX_ID_MAX_LENGTH,
+	TEXT_MIN_LENGTH
 } from '@/common/validation/validation-limits';
 
 import {CollectionValidatorDefinition} from './collection-validator-definition';
+
+const NUMERIC_BSON_TYPES = [ 'int', 'long', 'double', 'decimal' ];
+
+const addressSchema = {
+	bsonType : 'object',
+	required : [
+		'fullName',
+		'line1',
+		'city',
+		'postalCode',
+		'country',
+	],
+	properties : {
+		fullName : {
+			bsonType : 'string',
+			minLength : TEXT_MIN_LENGTH,
+			maxLength : ADDRESS_FULL_NAME_MAX_LENGTH,
+			description : 'fullName must be a non-empty string',
+		},
+		line1 : {
+			bsonType : 'string',
+			minLength : TEXT_MIN_LENGTH,
+			maxLength : ADDRESS_LINE_MAX_LENGTH,
+			description : 'line1 must be a non-empty string',
+		},
+		line2 : {
+			bsonType : 'string',
+			maxLength : ADDRESS_LINE_MAX_LENGTH,
+			description : 'line2 must be a string when present',
+		},
+		city : {
+			bsonType : 'string',
+			minLength : TEXT_MIN_LENGTH,
+			maxLength : ADDRESS_CITY_MAX_LENGTH,
+			description : 'city must be a non-empty string',
+		},
+		postalCode : {
+			bsonType : 'string',
+			minLength : TEXT_MIN_LENGTH,
+			maxLength : ADDRESS_POSTAL_CODE_MAX_LENGTH,
+			description : 'postalCode must be a non-empty string',
+		},
+		country : {
+			bsonType : 'string',
+			minLength : ADDRESS_COUNTRY_MIN_LENGTH,
+			maxLength : ADDRESS_COUNTRY_MAX_LENGTH,
+			description : 'country must be a valid string',
+		},
+		phone : {
+			bsonType : 'string',
+			maxLength : ADDRESS_PHONE_MAX_LENGTH,
+			description : 'phone must be a string when present',
+		},
+	},
+};
 
 export const orderValidator: CollectionValidatorDefinition = {
 	collectionName : 'orders',
@@ -23,6 +76,8 @@ export const orderValidator: CollectionValidatorDefinition = {
 			required : [
 				'userId',
 				'status',
+				'purchaseType',
+				'invoice',
 				'items',
 				'shippingAddress',
 				'totals',
@@ -43,12 +98,63 @@ export const orderValidator: CollectionValidatorDefinition = {
 						'shipped',
 						'completed',
 					],
-					description : 'status must be a valid order status',
+					description : 'status must be a supported order status',
+				},
+				purchaseType : {
+					enum : [
+						'private',
+						'company',
+					],
+					description : 'purchaseType must be private or company',
+				},
+				invoice : {
+					bsonType : 'object',
+					required : [
+						'requested',
+						'billingAddressSameAsShipping',
+					],
+					description : 'invoice must contain invoice request snapshot data',
+					properties : {
+						requested : {
+							bsonType : 'bool',
+							description : 'invoice.requested must be a boolean',
+						},
+						billingAddressSameAsShipping : {
+							bsonType : 'bool',
+							description : 'billingAddressSameAsShipping must be a boolean',
+						},
+						billingAddress : {
+							...addressSchema,
+							description : 'billingAddress must be an address object when present',
+						},
+						companyDetails : {
+							bsonType : 'object',
+							required : [
+								'companyName',
+								'taxId',
+							],
+							description : 'companyDetails must contain company invoice data',
+							properties : {
+								companyName : {
+									bsonType : 'string',
+									minLength : TEXT_MIN_LENGTH,
+									maxLength : COMPANY_NAME_MAX_LENGTH,
+									description : 'companyName must be a non-empty string',
+								},
+								taxId : {
+									bsonType : 'string',
+									minLength : TEXT_MIN_LENGTH,
+									maxLength : COMPANY_TAX_ID_MAX_LENGTH,
+									description : 'taxId must be a non-empty string',
+								},
+							},
+						},
+					},
 				},
 				items : {
 					bsonType : 'array',
 					minItems : 1,
-					description : 'items must contain at least one order item snapshot',
+					description : 'items must contain at least one order item',
 					items : {
 						bsonType : 'object',
 						required : [
@@ -62,34 +168,33 @@ export const orderValidator: CollectionValidatorDefinition = {
 						properties : {
 							productId : {
 								bsonType : 'objectId',
-								description : 'productId must be an ObjectId and is required',
+								description : 'productId must be an ObjectId',
 							},
 							productName : {
 								bsonType : 'string',
-								minLength : TEXT_MIN_LENGTH,
-								maxLength : PRODUCT_NAME_MAX_LENGTH,
-								description : 'productName must be a non-empty string',
+								description : 'productName must be a string',
 							},
 							productSlug : {
 								bsonType : 'string',
-								minLength : TEXT_MIN_LENGTH,
-								maxLength : PRODUCT_SLUG_MAX_LENGTH,
-								description : 'productSlug must be a non-empty string',
+								description : 'productSlug must be a string',
 							},
 							unitPriceAmount : {
-								bsonType : 'number',
-								minimum : PRICE_MIN_AMOUNT,
-								description :
-								    'unitPriceAmount must be a non-negative numeric amount in minor currency units',
+								bsonType : NUMERIC_BSON_TYPES,
+								minimum : 0,
+								description : 'unitPriceAmount must be a non-negative number',
 							},
 							currency : {
-								enum : [ 'PLN', 'EUR', 'USD' ],
+								enum : [
+									'PLN',
+									'EUR',
+									'USD',
+								],
 								description : 'currency must be supported',
 							},
 							quantity : {
-								bsonType : 'number',
-								minimum : CART_ITEM_MIN_QUANTITY,
-								description : 'quantity must be a positive number',
+								bsonType : NUMERIC_BSON_TYPES,
+								minimum : 1,
+								description : 'quantity must be positive',
 							},
 							imageUrl : {
 								bsonType : 'string',
@@ -99,57 +204,8 @@ export const orderValidator: CollectionValidatorDefinition = {
 					},
 				},
 				shippingAddress : {
-					bsonType : 'object',
-					required : [
-						'fullName',
-						'line1',
-						'city',
-						'postalCode',
-						'country',
-					],
-					description : 'shippingAddress must contain required delivery data',
-					properties : {
-						fullName : {
-							bsonType : 'string',
-							minLength : TEXT_MIN_LENGTH,
-							maxLength : ADDRESS_FULL_NAME_MAX_LENGTH,
-							description : 'fullName must be a non-empty string',
-						},
-						line1 : {
-							bsonType : 'string',
-							minLength : TEXT_MIN_LENGTH,
-							maxLength : ADDRESS_LINE_MAX_LENGTH,
-							description : 'line1 must be a non-empty string',
-						},
-						line2 : {
-							bsonType : 'string',
-							maxLength : ADDRESS_LINE_MAX_LENGTH,
-							description : 'line2 must be a string when present',
-						},
-						city : {
-							bsonType : 'string',
-							minLength : TEXT_MIN_LENGTH,
-							maxLength : ADDRESS_CITY_MAX_LENGTH,
-							description : 'city must be a non-empty string',
-						},
-						postalCode : {
-							bsonType : 'string',
-							minLength : TEXT_MIN_LENGTH,
-							maxLength : ADDRESS_POSTAL_CODE_MAX_LENGTH,
-							description : 'postalCode must be a non-empty string',
-						},
-						country : {
-							bsonType : 'string',
-							minLength : ADDRESS_COUNTRY_MIN_LENGTH,
-							maxLength : ADDRESS_COUNTRY_MAX_LENGTH,
-							description : 'country must be a valid non-empty string',
-						},
-						phone : {
-							bsonType : 'string',
-							maxLength : ADDRESS_PHONE_MAX_LENGTH,
-							description : 'phone must be a string when present',
-						},
-					},
+					...addressSchema,
+					description : 'shippingAddress must be an address object',
 				},
 				totals : {
 					bsonType : 'object',
@@ -159,25 +215,28 @@ export const orderValidator: CollectionValidatorDefinition = {
 						'totalAmount',
 						'currency',
 					],
-					description : 'totals must contain order monetary summary',
 					properties : {
 						subtotalAmount : {
-							bsonType : 'number',
-							minimum : PRICE_MIN_AMOUNT,
+							bsonType : NUMERIC_BSON_TYPES,
+							minimum : 0,
 							description : 'subtotalAmount must be non-negative',
 						},
 						shippingAmount : {
-							bsonType : 'number',
-							minimum : PRICE_MIN_AMOUNT,
+							bsonType : NUMERIC_BSON_TYPES,
+							minimum : 0,
 							description : 'shippingAmount must be non-negative',
 						},
 						totalAmount : {
-							bsonType : 'number',
-							minimum : PRICE_MIN_AMOUNT,
+							bsonType : NUMERIC_BSON_TYPES,
+							minimum : 0,
 							description : 'totalAmount must be non-negative',
 						},
 						currency : {
-							enum : [ 'PLN', 'EUR', 'USD' ],
+							enum : [
+								'PLN',
+								'EUR',
+								'USD',
+							],
 							description : 'currency must be supported',
 						},
 					},

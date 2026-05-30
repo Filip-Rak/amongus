@@ -551,7 +551,7 @@ DELETE {{baseUrl}}/products/{{productId}}
 # CART
 # =========================
 
-@cartProductId = {{productId}}
+@cartProductId = 6a1ad2caa3073b4327610e1f
 
 ###
 # Get cart
@@ -624,12 +624,44 @@ POST {{baseUrl}}/orders/checkout
 {
 	"shippingAddress": {
 		"fullName": "Jan Kowalski",
-		"line1": "Testowa 12",
-		"line2": "Apartment 4",
+		"line1": "Example Street 12",
 		"city": "Warsaw",
 		"postalCode": "00-001",
+		"country": "Poland"
+	}
+}
+
+###
+# Checkout
+# User
+POST {{baseUrl}}/orders/checkout
+{{auth}}
+{{json}}
+
+{
+	"purchaseType": "company",
+	"invoice": {
+		"requested": true,
+		"billingAddressSameAsShipping": false,
+		"billingAddress": {
+			"fullName": "ACME Sp. z o.o.",
+			"line1": "Business Street 1",
+			"city": "Warsaw",
+			"postalCode": "00-002",
+			"country": "Poland"
+		},
+		"companyDetails": {
+			"companyName": "ACME Sp. z o.o.",
+			"taxId": "1234567890"
+		}
+	},
+	"shippingAddress": {
+		"fullName": "Warehouse Receiver",
+		"line1": "Warehouse Street 5",
+		"city": "Warsaw",
+		"postalCode": "00-003",
 		"country": "Poland",
-		"phone": "+48123123123"
+		"phone": "+48123456789"
 	}
 }
 
@@ -650,7 +682,7 @@ GET {{baseUrl}}/orders/{{orderId}}
 # PAYMENTS
 # =========================
 
-@paymentId = 6a020cb567353eff5191ea4c
+@paymentId = 6a1b344114ed3a45597557d2
 
 ###
 # Payment success mock
@@ -676,7 +708,7 @@ POST {{baseUrl}}/payments/{{paymentId}}/mock-failure
 # REVIEWS
 # =========================
 
-@reviewProductId = {{productId}}
+@reviewProductId = 6a1ad2caa3073b4327610e1f
 @reviewId = 6a057117273e9d6f5d06df3e
 @adminReviewId = 6a0574464613c3f644e73dea
 
@@ -699,9 +731,9 @@ POST {{baseUrl}}/products/{{reviewProductId}}/reviews
 {{json}}
 
 {
-	"rating": 5,
-	"title": "Good product",
-	"comment": "Works as expected."
+	"rating": 4,
+	"title": "Almost perfect.",
+	"comment": "Well ventilated but lacks a cup holder."
 }
 
 ###
@@ -734,6 +766,4 @@ DELETE {{baseUrl}}/reviews/admin/{{adminReviewId}}
 {{auth}}
 
 # TODO: 
-# Add more stuff to checkout.
-# Add docs.
 # Final cleanup.

@@ -38,6 +38,8 @@ export const ADDRESS_POSTAL_CODE_MAX_LENGTH = 20;
 export const ADDRESS_COUNTRY_MIN_LENGTH     = 2;
 export const ADDRESS_COUNTRY_MAX_LENGTH     = 80;
 export const ADDRESS_PHONE_MAX_LENGTH       = 30;
+export const COMPANY_NAME_MAX_LENGTH        = 200;
+export const COMPANY_TAX_ID_MAX_LENGTH      = 40;
 
 export const CART_ITEM_MIN_QUANTITY = 1;
 export const CART_ITEM_MAX_QUANTITY = 100;

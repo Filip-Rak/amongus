@@ -1,5 +1,6 @@
-import {OrderAddressSnapshot, OrderTotals} from '@/orders/types/order-document.type';
+import {OrderAddressSnapshot, OrderInvoiceSnapshot, OrderTotals} from '@/orders/types/order-document.type';
 import {OrderStatus} from '@/orders/types/order-status.enum';
+import {PurchaseType} from '@/orders/types/purchase-type.enum';
 import {PaymentResponseDto} from '@/payments/dto/payment-response.dto';
 import {Currency} from '@/products/types/currency.enum';
 
@@ -17,6 +18,9 @@ export interface OrderResponseDto {
 	id: string;
 	userId: string;
 	status: OrderStatus;
+
+	purchaseType: PurchaseType;
+	invoice: OrderInvoiceSnapshot;
 
 	items: OrderItemResponseDto[];
 	shippingAddress: OrderAddressSnapshot;

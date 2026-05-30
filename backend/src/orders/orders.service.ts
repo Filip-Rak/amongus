@@ -10,10 +10,17 @@ import {ProductsRepository} from '@/products/products.repository';
 import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
 import {ObjectId} from 'mongodb';
 
-import {CheckoutDto} from './dto/checkout.dto';
+import {CheckoutCompanyDetailsDto, CheckoutDto, CheckoutInvoiceDto} from './dto/checkout.dto';
 import {CheckoutResponseDto, OrderItemResponseDto, OrderResponseDto} from './dto/order-response.dto';
 import {OrdersRepository} from './orders.repository';
-import {OrderAddressSnapshot, OrderItemSnapshot, OrderRecord} from './types/order-document.type';
+import {
+	OrderAddressSnapshot,
+	OrderCompanyDetailsSnapshot,
+	OrderInvoiceSnapshot,
+	OrderItemSnapshot,
+	OrderRecord
+} from './types/order-document.type';
+import {PurchaseType} from './types/purchase-type.enum';
 
 @Injectable() export class OrdersService
 {
@@ -130,11 +137,21 @@ import {OrderAddressSnapshot, OrderItemSnapshot, OrderRecord} from './types/orde
 			        0,
 			    );
 
+			    const shippingAddress = this.buildShippingAddressSnapshot( dto );
+			    const purchaseType    = dto.purchaseType ?? PurchaseType.Private;
+			    const invoice         = this.buildInvoiceSnapshot(
+			        dto.invoice,
+			        purchaseType,
+			        shippingAddress,
+			    );
+
 			    const order = await this.ordersRepository.create(
 			        {
 				        userId,
+				        purchaseType,
+				        invoice,
 				        items : orderItems,
-				        shippingAddress : this.buildShippingAddressSnapshot( dto ),
+				        shippingAddress,
 				        totals : {
 					        subtotalAmount,
 					        shippingAmount : OrdersService.SHIPPING_AMOUNT,
@@ -218,6 +235,79 @@ import {OrderAddressSnapshot, OrderItemSnapshot, OrderRecord} from './types/orde
 		return [...uniqueIds.values() ];
 	}
 
+	private buildInvoiceSnapshot(
+	    invoice: CheckoutInvoiceDto|undefined,
+	    purchaseType: PurchaseType,
+	    shippingAddress: OrderAddressSnapshot,
+	    ): OrderInvoiceSnapshot
+	{
+		const requested                    = invoice?.requested ?? false;
+		const billingAddressSameAsShipping = invoice?.billingAddressSameAsShipping ?? true;
+
+		if ( purchaseType === PurchaseType.Company && !requested )
+		{
+			throw new BadRequestException( 'Company purchases require an invoice' );
+		}
+
+		if ( purchaseType === PurchaseType.Private && invoice?.companyDetails )
+		{
+			throw new BadRequestException(
+			    'Company details are allowed only for company purchases',
+			);
+		}
+
+		if ( !requested )
+		{
+			return {
+				requested : false,
+				billingAddressSameAsShipping : true,
+			};
+		}
+
+		const billingAddress =
+		    billingAddressSameAsShipping ? shippingAddress : this.getBillingAddressOrThrow( invoice );
+
+		return omitUndefined( {
+			       requested : true,
+			       billingAddressSameAsShipping,
+			       billingAddress,
+			       companyDetails : purchaseType === PurchaseType.Company
+			                            ? this.buildCompanyDetailsSnapshot( invoice?.companyDetails )
+			                            : undefined,
+		       } ) as OrderInvoiceSnapshot;
+	}
+
+	private getBillingAddressOrThrow(
+	    invoice: CheckoutInvoiceDto|undefined,
+	    ): OrderAddressSnapshot
+	{
+		if ( !invoice?.billingAddress )
+		{
+			throw new BadRequestException(
+			    'Billing address is required when it is not the same as shipping address',
+			);
+		}
+
+		return this.mapAddressDtoToSnapshot( invoice.billingAddress );
+	}
+
+	private buildCompanyDetailsSnapshot(
+	    companyDetails: CheckoutCompanyDetailsDto|undefined,
+	    ): OrderCompanyDetailsSnapshot
+	{
+		if ( !companyDetails )
+		{
+			throw new BadRequestException(
+			    'Company details are required for company purchases',
+			);
+		}
+
+		return {
+			companyName : companyDetails.companyName,
+			taxId : companyDetails.taxId,
+		};
+	}
+
 	private async withOrderWriteErrorHandling< T >(
 	    operation: () => Promise< T >,
 	    ): Promise< T >
@@ -246,6 +336,8 @@ import {OrderAddressSnapshot, OrderItemSnapshot, OrderRecord} from './types/orde
 			       id : order._id.toHexString(),
 			       userId : order.userId.toHexString(),
 			       status : order.status,
+			       purchaseType : order.purchaseType,
+			       invoice : order.invoice,
 			       items :
 			           order.items.map( ( item ): OrderItemResponseDto => omitUndefined( {
 				                                                              productId : item.productId.toHexString(),
@@ -289,14 +381,21 @@ import {OrderAddressSnapshot, OrderItemSnapshot, OrderRecord} from './types/orde
 	    dto: CheckoutDto,
 	    ): OrderAddressSnapshot
 	{
+		return this.mapAddressDtoToSnapshot( dto.shippingAddress );
+	}
+
+	private mapAddressDtoToSnapshot(
+	    address: OrderAddressSnapshot,
+	    ): OrderAddressSnapshot
+	{
 		return omitUndefined( {
-			       fullName : dto.shippingAddress.fullName,
-			       line1 : dto.shippingAddress.line1,
-			       line2 : dto.shippingAddress.line2,
-			       city : dto.shippingAddress.city,
-			       postalCode : dto.shippingAddress.postalCode,
-			       country : dto.shippingAddress.country,
-			       phone : dto.shippingAddress.phone,
+			       fullName : address.fullName,
+			       line1 : address.line1,
+			       line2 : address.line2,
+			       city : address.city,
+			       postalCode : address.postalCode,
+			       country : address.country,
+			       phone : address.phone,
 		       } ) as OrderAddressSnapshot;
 	}
 }

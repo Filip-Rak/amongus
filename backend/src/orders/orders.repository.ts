@@ -6,14 +6,18 @@ import {Collection, ObjectId} from 'mongodb';
 import {
 	OrderAddressSnapshot,
 	OrderDocument,
+	OrderInvoiceSnapshot,
 	OrderItemSnapshot,
 	OrderRecord,
 	OrderTotals
 } from './types/order-document.type';
 import {OrderStatus} from './types/order-status.enum';
+import {PurchaseType} from './types/purchase-type.enum';
 
 export interface CreateOrderInput {
 	userId: ObjectId;
+	purchaseType: PurchaseType;
+	invoice: OrderInvoiceSnapshot;
 	items: OrderItemSnapshot[];
 	shippingAddress: OrderAddressSnapshot;
 	totals: OrderTotals;
@@ -75,6 +79,8 @@ export interface CreateOrderInput {
 		const document: OrderDocument = {
 			userId : input.userId,
 			status : OrderStatus.PendingPayment,
+			purchaseType : input.purchaseType,
+			invoice : input.invoice,
 			items : input.items,
 			shippingAddress : input.shippingAddress,
 			totals : input.totals,

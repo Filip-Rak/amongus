@@ -4,14 +4,14 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Debug nestjs back",
+            "name": "Debug back",
             "runtimeExecutable": "npm",
             "runtimeArgs": [ "run", "start:debug" ],
             "cwd": "${workspaceFolder}/backend",
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug nextjs front",
+            "name": "Debug front",
             "type": "node",
             "request": "launch",
             "runtimeExecutable": "npm",
