@@ -2,6 +2,7 @@ import { fetchWithAuth } from '../api.js';
 
 let productsData = [];
 let categoriesList = [];
+let currentAttributeDefs = [];
 
 export async function render(container) {
     container.innerHTML = `
@@ -17,7 +18,6 @@ export async function render(container) {
                 <thead>
                     <tr style="background-color: #f2f2f2;">
                         <th>Name</th>
-                        <th>Description</th>
                         <th>Category</th>
                         <th>Price</th>
                         <th>Stock</th>
@@ -26,11 +26,11 @@ export async function render(container) {
                     </tr>
                 </thead>
                 <tbody id="products-tbody">
-                    <tr><td colspan="7">Loading products data...</td></tr>
+                    <tr><td colspan="6">Loading products data...</td></tr>
                 </tbody>
             </table>
 
-            <div id="product-form-container" style="display: none; margin-top: 30px; border: 1px solid #ccc; padding: 20px; max-width: 500px; background-color: #fff;">
+            <div id="product-form-container" style="display: none; margin-top: 30px; border: 1px solid #ccc; padding: 20px; max-width: 600px; background-color: #fff;">
                 <h3 id="product-form-title">Add New Product</h3>
                 <form id="product-form">
                     <input type="hidden" id="product-id">
@@ -46,7 +46,7 @@ export async function render(container) {
                     </div>
 
                     <div style="margin-bottom: 15px;">
-                        <label>Category:</label><br>
+                        <label>Category (Controls Attributes):</label><br>
                         <select id="product-category" required style="width: 100%; padding: 5px;">
                             <option value="">-- Select Category --</option>
                         </select>
@@ -68,20 +68,19 @@ export async function render(container) {
                         <input type="url" id="product-image-url" style="width: 100%; padding: 5px; box-sizing: border-box;">
                     </div>
 
-                    <div style="margin-bottom: 15px; border: 1px solid #e9ecef; padding: 10px; border-radius: 4px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <label style="font-weight: bold;">Product Attributes:</label>
-                            <button type="button" id="add-attr-row-btn" style="padding: 2px 8px; background-color: #17a2b8; color: white; border: none; cursor: pointer; font-size: 12px;">+ Add Field</button>
+                    <div style="margin-bottom: 15px; border: 1px solid #17a2b8; padding: 15px; border-radius: 4px; background-color: #f8f9fa;">
+                        <h4 style="margin: 0 0 10px 0; color: #17a2b8;">Category Specific Attributes</h4>
+                        <div id="dynamic-attributes-wrapper">
+                            <p style="color: #666; font-size: 13px; margin: 0;">Select a category to view required specifications.</p>
                         </div>
-                        <div id="attributes-rows-wrapper"></div>
                     </div>
                     
                     <div style="margin-bottom: 15px; display: none;" id="product-status-group">
                         <label>Status:</label><br>
                         <select id="product-status" style="width: 100%; padding: 5px;">
                             <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
                             <option value="draft">Draft</option>
+                            <option value="archived">Archived</option>
                         </select>
                     </div>
                     
@@ -101,7 +100,12 @@ function attachEventListeners(container) {
     container.querySelector('#add-product-btn').addEventListener('click', showAddForm);
     container.querySelector('#cancel-product-btn').addEventListener('click', hideForm);
     container.querySelector('#product-form').addEventListener('submit', handleFormSubmit);
-    container.querySelector('#add-attr-row-btn').addEventListener('click', () => addAttributeRow());
+
+    // Watch for category selection to fetch schema definitions
+    container.querySelector('#product-category').addEventListener('change', async (e) => {
+        const categoryId = e.target.value;
+        await loadAndRenderCategoryAttributes(categoryId);
+    });
 
     container.querySelector('#products-tbody').addEventListener('click', (e) => {
         const id = e.target.dataset.id;
@@ -113,34 +117,11 @@ function attachEventListeners(container) {
             archiveProduct(id);
         }
     });
-
-    // Event delegation for dynamically added remove attribute buttons
-    container.querySelector('#attributes-rows-wrapper').addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-attr-btn')) {
-            e.target.closest('.attr-row').remove();
-        }
-    });
-}
-
-function addAttributeRow(key = '', value = '') {
-    const wrapper = document.getElementById('attributes-rows-wrapper');
-    const row = document.createElement('div');
-    row.classList.add('attr-row');
-    row.style.display = 'flex';
-    row.style.gap = '10px';
-    row.style.marginBottom = '8px';
-
-    row.innerHTML = `
-        <input type="text" placeholder="Key (e.g. color)" class="attr-key" value="${key}" required style="flex: 1; padding: 4px;">
-        <input type="text" placeholder="Value (e.g. black)" class="attr-value" value="${value}" required style="flex: 1; padding: 4px;">
-        <button type="button" class="remove-attr-btn" style="background-color: #dc3545; color: white; border: none; padding: 0 8px; cursor: pointer;">X</button>
-    `;
-    wrapper.appendChild(row);
 }
 
 async function loadCategories() {
     try {
-        const response = await fetchWithAuth('/categories/admin');
+        const response = await fetchWithAuth('/categories/admin?limit=100');
         const responseData = await response.json();
         if (response.ok && responseData && Array.isArray(responseData.items)) {
             categoriesList = responseData.items;
@@ -155,11 +136,89 @@ function populateCategoryDropdown() {
     select.innerHTML = '<option value="">-- Select Category --</option>';
 
     categoriesList.forEach(category => {
-        const option = document.createElement('option');
-        option.value = category.id;
-        option.textContent = category.name;
-        select.appendChild(option);
+        if (category.status !== 'archived') {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = category.name;
+            select.appendChild(option);
+        }
     });
+}
+
+async function loadAndRenderCategoryAttributes(categoryId, existingValues = {}) {
+    const wrapper = document.getElementById('dynamic-attributes-wrapper');
+
+    if (!categoryId) {
+        wrapper.innerHTML = '<p style="color: #666; font-size: 13px; margin: 0;">Select a category to view required specifications.</p>';
+        currentAttributeDefs = [];
+        return;
+    }
+
+    wrapper.innerHTML = '<p style="color: #666; font-size: 13px; margin: 0;">Fetching inherited attributes schema...</p>';
+
+    try {
+        const response = await fetchWithAuth(`/categories/${categoryId}/attributes`);
+        if (!response.ok) throw new Error('Could not load inherited attributes');
+
+        const data = await response.json();
+        currentAttributeDefs = data.attributes || [];
+
+        if (currentAttributeDefs.length === 0) {
+            wrapper.innerHTML = '<p style="color: #666; font-size: 13px; margin: 0;">No attributes required for this category tree.</p>';
+            return;
+        }
+
+        let html = '';
+        currentAttributeDefs.forEach(def => {
+            const val = existingValues[def.key] !== undefined ? existingValues[def.key] : '';
+            const reqAttr = def.isRequired ? 'required' : '';
+            const reqStar = def.isRequired ? '<span style="color:red;">*</span>' : '';
+            const unit = def.unit ? ` <small style="color:#666;">(${def.unit})</small>` : '';
+
+            html += `<div style="margin-bottom: 12px;" class="attr-field-group" data-key="${def.key}" data-type="${def.type}">`;
+            html += `<label style="font-size: 13px; font-weight: bold;">${def.label} ${reqStar}${unit}</label><br>`;
+
+            if (def.type === 'boolean') {
+                const isChecked = val === true ? 'checked' : '';
+                html += `<label style="font-size: 13px;"><input type="checkbox" class="attr-input-ctrl" ${isChecked}> Yes / Enabled</label>`;
+            } else if (def.allowedValues && def.allowedValues.length > 0) {
+                if (def.type === 'string_array') {
+                    html += `<select multiple class="attr-input-ctrl" style="width: 100%; padding: 5px;" ${reqAttr}>`;
+                    const valArr = Array.isArray(val) ? val : [];
+                    def.allowedValues.forEach(opt => {
+                        const sel = valArr.includes(opt) ? 'selected' : '';
+                        html += `<option value="${opt}" ${sel}>${opt}</option>`;
+                    });
+                    html += `</select><small style="color:#666; font-size:11px;">Hold Ctrl/Cmd to select multiple options</small>`;
+                } else {
+                    html += `<select class="attr-input-ctrl" style="width: 100%; padding: 5px;" ${reqAttr}>`;
+                    html += `<option value="">-- Choose --</option>`;
+                    def.allowedValues.forEach(opt => {
+                        const sel = val === opt ? 'selected' : '';
+                        html += `<option value="${opt}" ${sel}>${opt}</option>`;
+                    });
+                    html += `</select>`;
+                }
+            } else {
+                if (def.type === 'number') {
+                    const min = def.min !== undefined ? `min="${def.min}"` : '';
+                    const max = def.max !== undefined ? `max="${def.max}"` : '';
+                    html += `<input type="number" step="any" class="attr-input-ctrl" value="${val}" style="width: 100%; padding: 5px; box-sizing: border-box;" ${reqAttr} ${min} ${max}>`;
+                } else if (def.type === 'string_array') {
+                    const valStr = Array.isArray(val) ? val.join(', ') : '';
+                    html += `<input type="text" class="attr-input-ctrl" value="${valStr}" placeholder="Comma separated values" style="width: 100%; padding: 5px; box-sizing: border-box;" ${reqAttr}>`;
+                } else {
+                    html += `<input type="text" class="attr-input-ctrl" value="${val}" style="width: 100%; padding: 5px; box-sizing: border-box;" ${reqAttr}>`;
+                }
+            }
+            html += `</div>`;
+        });
+
+        wrapper.innerHTML = html;
+
+    } catch (error) {
+        wrapper.innerHTML = `<p style="color: red; font-size: 13px; margin: 0;">Error: ${error.message}</p>`;
+    }
 }
 
 async function loadProducts() {
@@ -181,7 +240,7 @@ async function loadProducts() {
         renderTable();
     } catch (error) {
         messageDiv.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
-        tbody.innerHTML = `<tr><td colspan="7">No data available.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6">No data available.</td></tr>`;
     }
 }
 
@@ -189,7 +248,7 @@ function renderTable() {
     const tbody = document.getElementById('products-tbody');
 
     if (productsData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7">No products found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6">No products found.</td></tr>`;
         return;
     }
 
@@ -200,12 +259,14 @@ function renderTable() {
 
         return `
             <tr>
-                <td><b>${product.name}</b></td>
-                <td>${product.description || ''}</td>
+                <td>
+                    <b>${product.name}</b><br>
+                    <small style="color: #6c757d;">${product.description ? product.description.substring(0, 40) + '...' : ''}</small>
+                </td>
                 <td><small>${categoryName}</small></td>
                 <td><code>${formattedPrice}</code></td>
                 <td>${product.stock}</td>
-                <td><span style="padding: 3px 6px; background-color: ${product.status === 'active' ? '#d4edda' : '#fff3cd'}">${product.status}</span></td>
+                <td><span style="padding: 3px 6px; background-color: ${product.status === 'active' ? '#d4edda' : (product.status === 'draft' ? '#e2e3e5' : '#fff3cd')}">${product.status}</span></td>
                 <td>
                     <button class="edit-btn" data-id="${product.id}">Edit</button>
                     ${product.status !== 'archived' ? `<button class="archive-btn" data-id="${product.id}" style="color: orange;">Archive</button>` : ''}
@@ -219,13 +280,15 @@ function showAddForm() {
     document.getElementById('product-form-title').innerText = 'Add New Product';
     document.getElementById('product-form').reset();
     document.getElementById('product-id').value = '';
-    document.getElementById('attributes-rows-wrapper').innerHTML = '';
+
+    document.getElementById('dynamic-attributes-wrapper').innerHTML = '<p style="color: #666; font-size: 13px; margin: 0;">Select a category to view required specifications.</p>';
+    currentAttributeDefs = [];
 
     document.getElementById('product-status-group').style.display = 'none';
     document.getElementById('product-form-container').style.display = 'block';
 }
 
-function showEditForm(id) {
+async function showEditForm(id) {
     const product = productsData.find(p => p.id === id);
     if (!product) return;
 
@@ -240,25 +303,19 @@ function showEditForm(id) {
     const primaryImg = product.images && product.images.find(img => img.isPrimary);
     document.getElementById('product-image-url').value = primaryImg ? primaryImg.url : '';
 
-    // Populate dynamic attributes fields from storage object
-    const wrapper = document.getElementById('attributes-rows-wrapper');
-    wrapper.innerHTML = '';
-    if (product.attributes && Object.keys(product.attributes).length > 0) {
-        Object.entries(product.attributes).forEach(([key, value]) => {
-            addAttributeRow(key, value);
-        });
-    }
-
     document.getElementById('product-status-group').style.display = 'block';
     document.getElementById('product-status').value = product.status;
-
     document.getElementById('product-form-container').style.display = 'block';
+
+    // Support both new `attributeValues` documentation schema and legacy `attributes` object just in case
+    const existingAttrData = product.attributeValues || product.attributes || {};
+    await loadAndRenderCategoryAttributes(product.categoryId, existingAttrData);
 }
 
 function hideForm() {
     document.getElementById('product-form-container').style.display = 'none';
     document.getElementById('product-form').reset();
-    document.getElementById('attributes-rows-wrapper').innerHTML = '';
+    document.getElementById('dynamic-attributes-wrapper').innerHTML = '';
 }
 
 async function handleFormSubmit(e) {
@@ -279,24 +336,37 @@ async function handleFormSubmit(e) {
 
     const priceAmountCents = Math.round(priceFloat * 100);
 
-    // Build the attributes object from dynamically generated inputs
-    const attributes = {};
-    const rows = document.querySelectorAll('.attr-row');
-    rows.forEach(row => {
-        const key = row.querySelector('.attr-key').value.trim();
-        const rawValue = row.querySelector('.attr-value').value.trim();
+    // Harvest dynamically rendered attribute inputs based on current category definitions
+    const attributeValues = {};
+    const attrGroups = document.querySelectorAll('.attr-field-group');
 
-        if (key) {
-            // Automatically cast types to fulfill strict validator requirements
-            if (rawValue.toLowerCase() === 'true') {
-                attributes[key] = true;
-            } else if (rawValue.toLowerCase() === 'false') {
-                attributes[key] = false;
-            } else if (!isNaN(rawValue) && rawValue !== '') {
-                attributes[key] = Number(rawValue);
+    attrGroups.forEach(group => {
+        const key = group.dataset.key;
+        const type = group.dataset.type;
+        const input = group.querySelector('.attr-input-ctrl');
+
+        if (type === 'boolean') {
+            attributeValues[key] = input.checked;
+        } else if (type === 'string_array') {
+            if (input.tagName === 'SELECT') {
+                const selected = Array.from(input.selectedOptions).map(opt => opt.value);
+                if (selected.length > 0 || input.hasAttribute('required')) {
+                    attributeValues[key] = selected;
+                }
             } else {
-                attributes[key] = rawValue;
+                const val = input.value.trim();
+                if (val) {
+                    attributeValues[key] = val.split(',').map(s => s.trim()).filter(s => s !== '');
+                } else if (input.hasAttribute('required')) {
+                    attributeValues[key] = [];
+                }
             }
+        } else if (type === 'number') {
+            const val = input.value;
+            if (val !== '') attributeValues[key] = parseFloat(val);
+        } else {
+            const val = input.value.trim();
+            if (val !== '') attributeValues[key] = val;
         }
     });
 
@@ -310,7 +380,7 @@ async function handleFormSubmit(e) {
                 categoryId,
                 price: { amount: priceAmountCents, currency: 'PLN' },
                 stock,
-                attributes,
+                attributeValues,
                 status
             };
 
@@ -331,8 +401,8 @@ async function handleFormSubmit(e) {
                 categoryId,
                 price: { amount: priceAmountCents, currency: 'PLN' },
                 stock,
-                status: 'active',
-                attributes,
+                status: 'draft',
+                attributeValues,
                 images: []
             };
 
@@ -347,7 +417,13 @@ async function handleFormSubmit(e) {
         }
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to save product');
+
+        if (!response.ok) {
+            // Unpack complex schema MongoDB validation errors if present in API response
+            const validationErrorsStr = data.validationErrors ? ` [${data.validationErrors.join(', ')}]` : '';
+            const errorMsg = Array.isArray(data.message) ? data.message.join(', ') : (data.message || 'Failed to save product');
+            throw new Error(errorMsg + validationErrorsStr);
+        }
 
         messageDiv.innerHTML = `<span style="color: green;">Product successfully saved.</span>`;
         hideForm();

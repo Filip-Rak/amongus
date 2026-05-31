@@ -249,47 +249,30 @@ POST {{baseUrl}}/categories
 {{json}}
 
 {
-	"name": "RTV",
-	"slug": "rtv",
-	"description": "Electronics and home media products",
+	"name": "test",
+	"slug": "test",
+	"description": "Mechanical, membrane and wireless keyboards",
 	"status": "active",
 	"attributeDefinitions": [
 		{
-			"key": "brand",
-			"label": "Brand",
+			"key": "layout",
+			"label": "Layout",
 			"type": "string",
 			"isRequired": true,
-			"allowedValues": [
-				"Logitech",
-				"Samsung",
-				"Sony"
-			]
-		},
-		{
-			"key": "warranty_months",
-			"label": "Warranty months",
-			"type": "number",
-			"isRequired": false,
+			"allowedValues": ["full-size", "TKL", "60%"],
 			"min": 0,
-			"max": 120,
-			"unit": "months"
+			"max": 0,
+			"unit": ""
 		},
 		{
-			"key": "wireless",
-			"label": "Wireless",
-			"type": "boolean",
-			"isRequired": false
-		},
-		{
-			"key": "tags",
-			"label": "Tags",
-			"type": "string_array",
+			"key": "switch_type",
+			"label": "Switch type",
+			"type": "string",
 			"isRequired": false,
-			"allowedValues": [
-				"gaming",
-				"office",
-				"portable"
-			]
+			"allowedValues": ["red", "brown", "blue"],
+			"min": 0,
+			"max": 0,
+			"unit": ""
 		}
 	]
 }
@@ -304,9 +287,9 @@ POST {{baseUrl}}/categories
 {{json}}
 
 {
-	"name": "Keyboards",
-	"slug": "keyboards",
-	"parentId": "{{parentCategoryId}}",
+	"name": "test",
+	"slug": "test",
+	//"parentId": "{{parentCategoryId}}",
 	"description": "Mechanical and membrane keyboards",
 	"status": "active",
 	"attributeDefinitions": [
@@ -334,6 +317,8 @@ POST {{baseUrl}}/categories
 		}
 	]
 }
+
+
 
 ###
 # Update category

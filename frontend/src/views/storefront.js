@@ -1,8 +1,7 @@
 import { fetchWithAuth } from '../api.js';
 
 let productsData = [];
-let paidProductIds = [];
-let categoriesData = [];
+let categoryTree = [];
 
 export async function render(container) {
     container.innerHTML = `
@@ -14,7 +13,6 @@ export async function render(container) {
                 </div>
             </header>
 
-            <!-- Simplest category filter dropdown configuration -->
             <div style="margin-bottom: 25px; display: flex; align-items: center; gap: 10px;">
                 <label for="storefront-category-filter" style="font-weight: bold; color: #333;">Category Filter:</label>
                 <select id="storefront-category-filter" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; background-color: #fff; font-size: 14px; cursor: pointer;">
@@ -31,19 +29,15 @@ export async function render(container) {
     `;
 
     attachEventListeners(container);
-
-    // Fetch categories alongside products and order histories
-    await Promise.all([loadPublicProducts(), loadPaidOrders(), loadPublicCategories(), updateCartCounter()]);
-
+    // Fetch multi-level category tree and active public products in parallel
+    await Promise.all([loadCategoryTree(), loadPublicProducts('all'), updateCartCounter()]);
     populateCategoryDropdown();
-    renderProductsGrid();
 }
 
 function attachEventListeners(container) {
     const grid = container.querySelector('#products-grid');
 
-    grid.addEventListener('click', async (e) => {
-        // Intercept product title or container wrapper clicks to open details view
+    grid.addEventListener('click', (e) => {
         if (e.target.classList.contains('product-title-link')) {
             const id = e.target.dataset.id;
             document.dispatchEvent(new CustomEvent('productDetailsRequested', { detail: { productId: id } }));
@@ -56,21 +50,21 @@ function attachEventListeners(container) {
         }
     });
 
-    container.querySelector('#storefront-category-filter').addEventListener('change', () => {
-        renderProductsGrid();
+    // Trigger api refetch on dropdown change event loop
+    container.querySelector('#storefront-category-filter').addEventListener('change', async (e) => {
+        const categoryId = e.target.value;
+        await loadPublicProducts(categoryId);
     });
 }
 
-async function loadPublicCategories() {
+async function loadCategoryTree() {
     try {
-        const response = await fetchWithAuth('/categories');
-        const responseData = await response.json();
+        const response = await fetchWithAuth('/categories/tree');
         if (response.ok) {
-            // Handle standard pagination wrapping structure or direct array lists fallback
-            categoriesData = responseData.items || responseData || [];
+            categoryTree = await response.json();
         }
     } catch (error) {
-        console.error('Failed to load public categories stream', error);
+        console.error('Failed to load hierarchical category tree', error);
     }
 }
 
@@ -78,68 +72,56 @@ function populateCategoryDropdown() {
     const select = document.getElementById('storefront-category-filter');
     if (!select) return;
 
-    categoriesData.forEach(category => {
-        const option = document.createElement('option');
-        option.value = category.id;
-        option.textContent = category.name;
-        select.appendChild(option);
-    });
-}
+    // Recursive helper to flatten category tree into select options with indents
+    function appendCategoryOptions(nodes, depth = 0) {
+        nodes.forEach(node => {
+            const option = document.createElement('option');
+            option.value = node.id;
+            option.innerHTML = '— '.repeat(depth) + node.name;
+            select.appendChild(option);
 
-async function loadPaidOrders() {
-    try {
-        const response = await fetchWithAuth('/orders/my');
-        if (!response.ok) return;
-        const data = await response.json();
-        const orders = Array.isArray(data) ? data : (data.items || []);
-
-        const paidOrders = orders.filter(order => order.status === 'paid');
-        const ids = [];
-        paidOrders.forEach(order => {
-            if (order.items) {
-                order.items.forEach(item => {
-                    if (item.productId) ids.push(item.productId);
-                });
+            if (node.children && node.children.length > 0) {
+                appendCategoryOptions(node.children, depth + 1);
             }
         });
-        paidProductIds = [...new Set(ids)];
-    } catch (error) {
-        console.error('Failed to analyze paid user orders history', error);
     }
+
+    appendCategoryOptions(categoryTree);
 }
 
-async function loadPublicProducts() {
+async function loadPublicProducts(categoryId) {
+    const grid = document.getElementById('products-grid');
+    grid.innerHTML = '<p>Loading products...</p>';
+
     try {
-        const response = await fetchWithAuth('/products');
+        let url = '/products?limit=100';
+        // Append nested query options to pull items from children branches too
+        if (categoryId && categoryId !== 'all') {
+            url += `&categoryId=${categoryId}&includeSubcategories=true`;
+        }
+
+        const response = await fetchWithAuth(url);
         const responseData = await response.json();
+
         if (!response.ok) throw new Error(responseData.message || 'Failed to fetch products');
 
-        if (responseData && Array.isArray(responseData.items)) {
-            productsData = responseData.items.filter(p => p.status === 'active');
-        } else {
-            throw new Error('Unexpected data format received from server');
-        }
+        productsData = Array.isArray(responseData.items) ? responseData.items : [];
+        renderProductsGrid();
     } catch (error) {
         document.getElementById('storefront-message').innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
+        grid.innerHTML = '<p>No products available.</p>';
     }
 }
 
 function renderProductsGrid() {
     const grid = document.getElementById('products-grid');
-    const filterSelect = document.getElementById('storefront-category-filter');
-    const selectedCategoryId = filterSelect ? filterSelect.value : 'all';
 
-    let displayProducts = productsData;
-    if (selectedCategoryId !== 'all') {
-        displayProducts = productsData.filter(product => product.categoryId === selectedCategoryId);
-    }
-
-    if (displayProducts.length === 0) {
-        grid.innerHTML = '<p>No products found matching the selected category filter.</p>';
+    if (productsData.length === 0) {
+        grid.innerHTML = '<p>No products found matching the criteria.</p>';
         return;
     }
 
-    grid.innerHTML = displayProducts.map(product => {
+    grid.innerHTML = productsData.map(product => {
         const formattedPrice = product.price ? `${(product.price.amount / 100).toFixed(2)} ${product.price.currency}` : 'N/A';
         const primaryImg = product.images && product.images.find(img => img.isPrimary);
 
@@ -171,94 +153,6 @@ function renderProductsGrid() {
             </div>
         `;
     }).join('');
-}
-
-async function handleToggleReviews(productId, buttonElement) {
-    const listDiv = document.getElementById(`reviews-list-${productId}`);
-    if (listDiv.style.display === 'block') {
-        listDiv.style.display = 'none';
-        buttonElement.textContent = 'Show Reviews';
-        return;
-    }
-
-    listDiv.innerHTML = '<p style="font-size:11px; color:#666;">Loading reviews...</p>';
-    listDiv.style.display = 'block';
-    buttonElement.textContent = 'Hide Reviews';
-
-    try {
-        const response = await fetchWithAuth(`/products/${productId}/reviews`);
-        const data = await response.json();
-        if (!response.ok) throw new Error();
-
-        const reviews = Array.isArray(data) ? data : (data.items || []);
-
-        if (reviews.length === 0) {
-            listDiv.innerHTML = '<p style="font-size:11px; color:#999; margin:5px 0;">No reviews for this product yet.</p>';
-            return;
-        }
-
-        listDiv.innerHTML = reviews.map(rev => `
-            <div style="padding: 5px 0; border-bottom: 1px solid #f1f1f1; font-size: 12px;">
-                <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                    <span>${rev.title}</span>
-                    <span style="color:#ffc107;">${'★'.repeat(rev.rating)}</span>
-                </div>
-                <p style="margin:2px 0 0 0; color:#555;">${rev.comment}</p>
-            </div>
-        `).join('');
-    } catch (error) {
-        listDiv.innerHTML = '<p style="font-size:11px; color:red; margin:5px 0;">Failed to load reviews.</p>';
-    }
-}
-
-function handleToggleReviewForm(productId) {
-    const formDiv = document.getElementById(`review-form-${productId}`);
-    formDiv.style.display = formDiv.style.display === 'block' ? 'none' : 'block';
-}
-
-async function handleSubmitReview(productId, submitButton) {
-    const titleInput = document.getElementById(`rev-title-${productId}`);
-    const ratingSelect = document.getElementById(`rev-rating-${productId}`);
-    const commentInput = document.getElementById(`rev-comment-${productId}`);
-    const messageDiv = document.getElementById('storefront-message');
-
-    const payload = {
-        title: titleInput.value.trim(),
-        rating: parseInt(ratingSelect.value, 10),
-        comment: commentInput.value.trim()
-    };
-
-    if (!payload.title || !payload.comment) return;
-
-    submitButton.disabled = true;
-
-    try {
-        const response = await fetchWithAuth(`/products/${productId}/reviews`, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to submit review');
-
-        messageDiv.innerHTML = '<span style="color: green;">Review added successfully!</span>';
-
-        titleInput.value = '';
-        commentInput.value = '';
-        document.getElementById(`review-form-${productId}`).style.display = 'none';
-
-        const toggleBtn = document.querySelector(`.toggle-reviews-btn[data-id="${productId}"]`);
-        if (toggleBtn && toggleBtn.textContent === 'Hide Reviews') {
-            document.getElementById(`reviews-list-${productId}`).style.display = 'none';
-            await handleToggleReviews(productId, toggleBtn);
-        }
-
-        setTimeout(() => { messageDiv.innerHTML = ''; }, 3000);
-    } catch (error) {
-        messageDiv.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
-    } finally {
-        submitButton.disabled = false;
-    }
 }
 
 async function updateCartCounter() {
