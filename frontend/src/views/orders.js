@@ -9,7 +9,18 @@ export async function render(container) {
         </div>
     `;
 
+    attachEventListeners(container);
     await loadMyOrders();
+}
+
+function attachEventListeners(container) {
+    // Handle dynamic click interaction for product review redirection links
+    container.querySelector('#orders-list').addEventListener('click', (e) => {
+        if (e.target.classList.contains('review-item-btn')) {
+            const productId = e.target.dataset.productId;
+            document.dispatchEvent(new CustomEvent('productDetailsRequested', { detail: { productId } }));
+        }
+    });
 }
 
 async function loadMyOrders() {
@@ -34,12 +45,15 @@ async function loadMyOrders() {
             const datePaid = order.paidAt ? new Date(order.paidAt).toLocaleString() : null;
             const dateCancelled = order.cancelledAt ? new Date(order.cancelledAt).toLocaleString() : null;
 
-            // Define status color code mapping
+            // Define status color definitions mapping
             let statusColor = '#ffc107';
-            if (order.status === 'paid') statusColor = '#28a745';
-            if (order.status === 'cancelled') statusColor = '#dc3545';
+            if (order.status === 'paid' || order.status === 'shipped' || order.status === 'completed') statusColor = '#28a745';
+            if (order.status === 'cancelled' || order.status === 'payment_failed') statusColor = '#dc3545';
 
-            // Generate HTML layout structure for purchased items inside single order
+            // Check if order lifecycle allows posting public reviews
+            const canReview = ['paid', 'shipped', 'completed'].includes(order.status);
+
+            // Generate HTML layout structure for purchased items inside single order snapshot
             const itemsHtml = order.items && order.items.length > 0
                 ? order.items.map(item => {
                     const unitPrice = (item.unitPriceAmount / 100).toFixed(2);
@@ -49,13 +63,18 @@ async function loadMyOrders() {
                         ? `<img src="${item.imageUrl}" alt="${item.productName}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 12px;">`
                         : `<div style="width: 50px; height: 50px; background: #e9ecef; border-radius: 4px; margin-right: 12px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6c757d; border: 1px solid #dee2e6;">No image</div>`;
 
+                    const reviewButtonHtml = canReview
+                        ? `<button class="review-item-btn" data-product-id="${item.productId}" style="margin-top: 5px; padding: 3px 8px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Write a Review</button>`
+                        : '';
+
                     return `
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid #f8f9fa; padding-bottom: 10px;">
                             <div style="display: flex; align-items: center;">
                                 ${imgHtml}
                                 <div>
                                     <span style="font-weight: bold; color: #212529;">${item.productName}</span><br>
-                                    <small style="color: #6c757d;">Unit Price: ${unitPrice} ${item.currency}</small>
+                                    <small style="color: #6c757d;">Unit Price: ${unitPrice} ${item.currency}</small><br>
+                                    ${reviewButtonHtml}
                                 </div>
                             </div>
                             <div style="text-align: right; min-width: 100px;">
@@ -67,15 +86,42 @@ async function loadMyOrders() {
                 }).join('')
                 : '<p style="font-size: 14px; color: #6c757d;">No items inside this order record.</p>';
 
-            // Handle math pricing structures conversions
+            // Convert currency pricing schemas
             const subtotal = (order.totals.subtotalAmount / 100).toFixed(2);
             const shipping = (order.totals.shippingAmount / 100).toFixed(2);
             const total = (order.totals.totalAmount / 100).toFixed(2);
             const currency = order.totals.currency;
 
+            // Parse shipping address
             const addr = order.shippingAddress || {};
             const addressLine2Html = addr.line2 ? `${addr.line2}<br>` : '';
             const phoneHtml = addr.phone ? `<br><b>Phone:</b> ${addr.phone}` : '';
+
+            // Parse and format invoice snapshot metadata fields if requested during checkout
+            let invoiceBlockHtml = '';
+            if (order.invoice && order.invoice.requested) {
+                const comp = order.invoice.companyDetails || {};
+                const bill = order.invoice.billingAddress || {};
+
+                let billingDetailsHtml = 'Same as shipping destination address';
+                if (!order.invoice.billingAddressSameAsShipping && bill.fullName) {
+                    billingDetailsHtml = `
+                        ${bill.fullName}, ${bill.line1}, 
+                        ${bill.postalCode} ${bill.city}, ${bill.country}
+                    `;
+                }
+
+                invoiceBlockHtml = `
+                    <div style="margin-top: 15px; padding: 12px; border: 1px dashed #28a745; background-color: #f9fff9; border-radius: 4px; font-size: 13px;">
+                        <h5 style="margin: 0 0 8px 0; color: #28a745; font-size: 14px;">Invoice Snapshot Request</h5>
+                        ${order.purchaseType === 'company' ? `
+                            <p style="margin: 3px 0;"><b>Company Name:</b> ${comp.companyName}</p>
+                            <p style="margin: 3px 0;"><b>Tax ID (NIP):</b> <code>${comp.taxId}</code></p>
+                        ` : '<p style="margin: 3px 0;"><b>Type:</b> Private Invoice</p>'}
+                        <p style="margin: 5px 0 0 0; color: #555; line-height: 1.4;"><b>Billing Address:</b> ${billingDetailsHtml}</p>
+                    </div>
+                `;
+            }
 
             return `
                 <div style="border: 1px solid #dee2e6; padding: 20px; margin-bottom: 25px; background-color: #fff; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
@@ -83,6 +129,9 @@ async function loadMyOrders() {
                         <div>
                             <span style="font-size: 13px; color: #6c757d; display: block; margin-bottom: 2px;">Order Reference ID:</span>
                             <code style="font-size: 15px; font-weight: bold; color: #212529;">${order.id}</code>
+                            <span style="font-size: 11px; margin-top: 4px; display: inline-block; padding: 2px 6px; background: #e9ecef; border-radius: 3px; color: #495057; font-weight: bold; text-transform: uppercase;">
+                                ${order.purchaseType} Purchase
+                            </span>
                         </div>
                         <div style="text-align: right;">
                             <span style="font-size: 12px; color: #6c757d; display: block;">Placed on: ${dateCreated}</span>
@@ -99,6 +148,7 @@ async function loadMyOrders() {
                         <div style="flex: 2; min-width: 280px;">
                             <h4 style="margin: 0 0 12px 0; color: #495057; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Items Summaries</h4>
                             ${itemsHtml}
+                            ${invoiceBlockHtml}
                         </div>
                         
                         <div style="flex: 1; min-width: 240px; background-color: #f8f9fa; padding: 15px; border-radius: 4px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #e9ecef;">

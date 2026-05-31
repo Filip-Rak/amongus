@@ -2,16 +2,26 @@ import { fetchWithAuth } from '../api.js';
 
 let productData = null;
 let hasPurchased = false;
+let flatCategoriesList = [];
+let categoryAttributesDefs = []; // Store mapping schema for keys and labels
 
 export async function render(container, productId) {
     container.innerHTML = `<div style="font-family: sans-serif; padding: 20px;"><p>Loading product details...</p></div>`;
 
-    await Promise.all([loadProductDetails(productId), checkUserPurchaseHistory(productId)]);
+    // Product details must be loaded first to obtain the categoryId
+    await loadProductDetails(productId);
 
     if (!productData) {
         container.innerHTML = `<div style="font-family: sans-serif; padding: 20px; color: red;">Product not found.</div>`;
         return;
     }
+
+    // Fetch remaining dependencies including the inherited attribute definitions
+    await Promise.all([
+        checkUserPurchaseHistory(productId),
+        loadFlatCategories(),
+        loadCategoryAttributes(productData.categoryId)
+    ]);
 
     const formattedPrice = productData.price ? `${(productData.price.amount / 100).toFixed(2)} ${productData.price.currency}` : 'N/A';
     const primaryImg = productData.images && productData.images.find(img => img.isPrimary);
@@ -19,16 +29,40 @@ export async function render(container, productId) {
         ? `<img src="${primaryImg.url}" alt="${primaryImg.alt || productData.name}" style="max-width: 100%; height: 300px; object-fit: cover; border-radius: 8px;">`
         : `<div style="width: 100%; height: 300px; background-color: #e9ecef; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d;">No Image Available</div>`;
 
-    // Map technical attributes from MongoDB document schema if present
-    const attributesHtml = productData.attributes && Object.keys(productData.attributes).length > 0
-        ? Object.entries(productData.attributes).map(([key, val]) => `<li><b>${key}:</b> ${val}</li>`).join('')
+    // Map the nested categories trail path (Breadcrumbs) using data references
+    let categoryTrailHtml = 'Uncategorized';
+    const currentCategory = flatCategoriesList.find(c => c.id === productData.categoryId);
+    if (currentCategory) {
+        const trailNames = [];
+        if (currentCategory.ancestorIds && Array.isArray(currentCategory.ancestorIds)) {
+            currentCategory.ancestorIds.forEach(ancId => {
+                const ancCat = flatCategoriesList.find(c => c.id === ancId);
+                if (ancCat) trailNames.push(ancCat.name);
+            });
+        }
+        trailNames.push(currentCategory.name);
+        categoryTrailHtml = trailNames.join(' &gt; ');
+    }
+
+    // Adapt formatting to fit strict technical validation rules from backend schema
+    const targetAttributes = productData.attributeValues || productData.attributes || {};
+    const attributesHtml = Object.keys(targetAttributes).length > 0
+        ? Object.entries(targetAttributes).map(([key, val]) => {
+            const def = categoryAttributesDefs.find(a => a.key === key);
+            const displayLabel = def ? def.label : key;
+            const formattedVal = Array.isArray(val) ? val.join(', ') : val;
+            return `<li><b>${displayLabel}:</b> ${formattedVal}</li>`;
+        }).join('')
         : '<li>No specific attributes listed.</li>';
 
     container.innerHTML = `
         <div style="font-family: sans-serif; padding: 20px; max-width: 900px; margin: 0 auto;">
-            <button id="back-to-store-btn" style="padding: 8px 15px; margin-bottom: 20px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">
-                &larr; Back to Catalog
-            </button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <button id="back-to-store-btn" style="padding: 8px 15px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">
+                    &larr; Back to Catalog
+                </button>
+                <span style="font-size: 13px; color: #6c757d;"><b>Path:</b> ${categoryTrailHtml}</span>
+            </div>
 
             <div id="details-message" style="margin-bottom: 15px; font-weight: bold;"></div>
 
@@ -39,16 +73,16 @@ export async function render(container, productId) {
                 <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; justify-content: space-between;">
                     <div>
                         <h2 style="margin: 0 0 10px 0; color: #333;">${productData.name}</h2>
-                        <p style="color: #6c757d; line-height: 1.5;">${productData.description || ''}</p>
-                        <h4 style="margin: 20px 0 5px 0;">Specifications:</h4>
-                        <ul style="margin: 0; padding-left: 20px; color: #555;">
+                        <p style="color: #6c757d; line-height: 1.5; font-size: 15px;">${productData.description || ''}</p>
+                        <h4 style="margin: 20px 0 5px 0;">Technical Specifications:</h4>
+                        <ul style="margin: 0; padding-left: 20px; color: #555; line-height: 1.6;">
                             ${attributesHtml}
                         </ul>
                     </div>
                     <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #eee;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <span style="font-size: 24px; font-weight: bold; color: #28a745;">${formattedPrice}</span>
-                            <span style="color: ${productData.stock <= 0 ? 'red' : '#6c757d'};">
+                            <span style="color: ${productData.stock <= 0 ? 'red' : '#6c757d'}; font-size: 14px;">
                                 ${productData.stock <= 0 ? 'Out of stock' : `Available Stock: ${productData.stock}`}
                             </span>
                         </div>
@@ -76,7 +110,7 @@ export async function render(container, productId) {
                         <option value="2">2 Stars</option>
                         <option value="1">1 Star</option>
                     </select>
-                    <textarea id="details-rev-comment" placeholder="Write your comments here..." rows="3" required style="width:100%; margin-bottom:10px; padding:6px; box-sizing:border-box;"></textarea>
+                    <textarea id="details-rev-comment" placeholder="Write your comments here..." rows="3" required style="width:100%; margin-bottom:10px; padding:6px; box-sizing:border-box("></textarea>
                     <button id="details-submit-review-btn" style="padding: 8px 15px; background-color: #28a745; color: white; border: none; cursor: pointer; font-weight: bold;">Submit Review</button>
                 </div>
 
@@ -120,6 +154,19 @@ async function loadProductDetails(productId) {
         }
     } catch (error) {
         console.error('Failed to resolve product data response payload', error);
+    }
+}
+
+async function loadFlatCategories() {
+    try {
+        // Changed endpoint from '/categories/admin?limit=100' to public route to avoid 403 error for customers
+        const response = await fetchWithAuth('/categories?limit=100');
+        if (response.ok) {
+            const data = await response.json();
+            flatCategoriesList = data.items || [];
+        }
+    } catch (error) {
+        console.error('Failed to pre-fetch category indexing fields', error);
     }
 }
 
@@ -216,5 +263,17 @@ async function handleReviewSubmit(productId, submitButton) {
         messageDiv.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
     } finally {
         submitButton.disabled = false;
+    }
+}
+
+async function loadCategoryAttributes(categoryId) {
+    try {
+        const response = await fetchWithAuth(`/categories/${categoryId}/attributes`);
+        if (response.ok) {
+            const data = await response.json();
+            categoryAttributesDefs = data.attributes || [];
+        }
+    } catch (error) {
+        console.error('Failed to load category attribute definitions map', error);
     }
 }
