@@ -4,11 +4,14 @@ let productData = null;
 let hasPurchased = false;
 let flatCategoriesList = [];
 let categoryAttributesDefs = []; // Store mapping schema for keys and labels
+let currentUserId = null;       // ID of logged in user
+let editingReviewId = null;
 
 export async function render(container, productId) {
     container.innerHTML = `<div style="font-family: sans-serif; padding: 20px;"><p>Loading product details...</p></div>`;
 
-    // Product details must be loaded first to obtain the categoryId
+    editingReviewId = null; // Reset edit context on view activation
+
     await loadProductDetails(productId);
 
     if (!productData) {
@@ -16,11 +19,11 @@ export async function render(container, productId) {
         return;
     }
 
-    // Fetch remaining dependencies including the inherited attribute definitions
     await Promise.all([
         checkUserPurchaseHistory(productId),
         loadFlatCategories(),
-        loadCategoryAttributes(productData.categoryId)
+        loadCategoryAttributes(productData.categoryId),
+        loadCurrentUserId() // Retrieve identity profile context
     ]);
 
     const formattedPrice = productData.price ? `${(productData.price.amount / 100).toFixed(2)} ${productData.price.currency}` : 'N/A';
@@ -135,6 +138,9 @@ function attachEventListeners(container, productId) {
     const openFormBtn = container.querySelector('#open-review-form-btn');
     if (openFormBtn) {
         openFormBtn.addEventListener('click', () => {
+            editingReviewId = null;
+            container.querySelector('#details-review-form-container h4').innerText = 'Submit Product Feedback';
+            document.getElementById('details-submit-review-btn').innerText = 'Submit Review';
             const form = document.getElementById('details-review-form-container');
             form.style.display = form.style.display === 'block' ? 'none' : 'block';
         });
@@ -144,6 +150,18 @@ function attachEventListeners(container, productId) {
     if (submitReviewBtn) {
         submitReviewBtn.addEventListener('click', () => handleReviewSubmit(productId, submitReviewBtn));
     }
+
+    // Intercept clicks on dynamically rendered edit and delete actions inside the reviews stream
+    container.querySelector('#details-reviews-list').addEventListener('click', (e) => {
+        const reviewId = e.target.dataset.reviewId;
+        if (!reviewId) return;
+
+        if (e.target.classList.contains('edit-own-review-btn')) {
+            setupReviewEdit(reviewId);
+        } else if (e.target.classList.contains('delete-own-review-btn')) {
+            handleReviewDelete(productId, reviewId);
+        }
+    });
 }
 
 async function loadProductDetails(productId) {
@@ -197,15 +215,28 @@ async function loadProductReviews(productId) {
             return;
         }
 
-        listDiv.innerHTML = reviews.map(rev => `
-            <div style="padding: 12px 0; border-bottom: 1px solid #eee;">
-                <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px;">
-                    <span>${rev.title}</span>
-                    <span style="color: #ffc107;">${'★'.repeat(rev.rating)}</span>
+        listDiv.innerHTML = reviews.map(rev => {
+            // Check review ownership flag
+            const isOwnReview = rev.userId === currentUserId;
+
+            const actionButtons = isOwnReview
+                ? `<div style="margin-top: 8px;">
+                     <button class="edit-own-review-btn" data-review-id="${rev.id}" style="padding: 2px 8px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; margin-right: 5px;">Edit</button>
+                     <button class="delete-own-review-btn" data-review-id="${rev.id}" style="padding: 2px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px;">Delete</button>
+                   </div>`
+                : '';
+
+            return `
+                <div style="padding: 12px 0; border-bottom: 1px solid #eee;" class="review-item-block" data-title="${rev.title}" data-rating="${rev.rating}" data-comment="${rev.comment}">
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px;">
+                        <span>${rev.title}</span>
+                        <span style="color: #ffc107;">${'★'.repeat(rev.rating)}</span>
+                    </div>
+                    <p style="margin: 0; color: #555; font-size: 14px;">${rev.comment}</p>
+                    ${actionButtons}
                 </div>
-                <p style="margin: 0; color: #555; font-size: 14px;">${rev.comment}</p>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (error) {
         listDiv.innerHTML = '<p style="color: red;">Failed to load reviews payload.</p>';
     }
@@ -245,19 +276,40 @@ async function handleReviewSubmit(productId, submitButton) {
     submitButton.disabled = true;
 
     try {
-        const response = await fetchWithAuth(`/products/${productId}/reviews`, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
+        let response;
+        if (editingReviewId) {
+            // Update an existing active review owned by the session context user (Section 11.5)
+            response = await fetchWithAuth(`/reviews/${editingReviewId}`, {
+                method: 'PATCH',
+                body: JSON.stringify(payload)
+            });
+        } else {
+            // Create a brand new product review entry instance (Section 11.4)
+            response = await fetchWithAuth(`/products/${productId}/reviews`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+        }
+
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Feedback rejection');
 
-        messageDiv.innerHTML = '<span style="color: green;">Review added successfully.</span>';
+        messageDiv.innerHTML = `<span style="color: green;">Review ${editingReviewId ? 'updated' : 'added'} successfully.</span>`;
+
+        // Restore default state parameters mapping controls
         titleInput.value = '';
         commentInput.value = '';
+        editingReviewId = null;
+        document.querySelector('#details-review-form-container h4').innerText = 'Submit Product Feedback';
+        submitButton.innerText = 'Submit Review';
         document.getElementById('details-review-form-container').style.display = 'none';
 
-        await loadProductReviews(productId);
+        // Parallel data refresh since average statistics are recalculated by backend on writes
+        await Promise.all([
+            loadProductDetails(productId),
+            loadProductReviews(productId)
+        ]);
+
         setTimeout(() => { messageDiv.innerHTML = ''; }, 3000);
     } catch (error) {
         messageDiv.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
@@ -275,5 +327,67 @@ async function loadCategoryAttributes(categoryId) {
         }
     } catch (error) {
         console.error('Failed to load category attribute definitions map', error);
+    }
+}
+
+async function loadCurrentUserId() {
+    try {
+        const response = await fetchWithAuth('/users/me');
+        if (response.ok) {
+            const data = await response.json();
+            currentUserId = data.id;
+        }
+    } catch (error) {
+        console.error('Failed to retrieve active user context info', error);
+    }
+}
+
+function setupReviewEdit(reviewId) {
+    const btn = document.querySelector(`.edit-own-review-btn[data-review-id="${reviewId}"]`);
+    const block = btn.closest('.review-item-block');
+
+    const title = block.dataset.title;
+    const rating = block.dataset.rating;
+    const comment = block.dataset.comment;
+
+    document.getElementById('details-rev-title').value = title;
+    document.getElementById('details-rev-rating').value = rating;
+    document.getElementById('details-rev-comment').value = comment;
+
+    editingReviewId = reviewId;
+    document.querySelector('#details-review-form-container h4').innerText = 'Edit Your Review';
+    document.getElementById('details-submit-review-btn').innerText = 'Update Review';
+
+    const form = document.getElementById('details-review-form-container');
+    form.style.display = 'block';
+    form.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function handleReviewDelete(productId, reviewId) {
+    if (!confirm('Are you sure you want to delete your review?')) return;
+    const messageDiv = document.getElementById('details-message');
+
+    try {
+        // Soft delete active review entry owned by current session container context (Section 11.6)
+        const response = await fetchWithAuth(`/reviews/${reviewId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.message || 'Failed to delete review');
+        }
+
+        messageDiv.innerHTML = '<span style="color: green;">Review deleted successfully.</span>';
+
+        // Refresh product aggregations layout parameters
+        await Promise.all([
+            loadProductDetails(productId),
+            loadProductReviews(productId)
+        ]);
+
+        setTimeout(() => { messageDiv.innerHTML = ''; }, 3000);
+    } catch (error) {
+        messageDiv.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
     }
 }
