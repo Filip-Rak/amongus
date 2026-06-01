@@ -10,6 +10,7 @@ export interface CreateReviewInput {
 	productId: ObjectId;
 	userId: ObjectId;
 	orderId: ObjectId;
+	productName: string;
 	rating: number;
 	title?: string;
 	comment?: string;
@@ -23,6 +24,12 @@ export interface UpdateReviewInput {
 
 export interface FindReviewsInput {
 	productId: ObjectId;
+	page: number;
+	limit: number;
+}
+
+export interface FindUserReviewsInput {
+	userId: ObjectId;
 	page: number;
 	limit: number;
 }
@@ -109,6 +116,7 @@ export interface ReviewStats {
 			productId : input.productId,
 			userId : input.userId,
 			orderId : input.orderId,
+			productName : input.productName,
 			rating : input.rating,
 			title : input.title,
 			comment : input.comment,
@@ -153,26 +161,20 @@ export interface ReviewStats {
 			status : ReviewStatus.Active,
 		};
 
-		const skip = ( input.page - 1 ) * input.limit;
+		return this.findMany( filter, input.page, input.limit, options );
+	}
 
-		const [ reviews, total ] = await Promise.all( [
-			this.reviews
-			    .find( filter, {
-				    session : options?.session,
-			    } )
-			    .sort( { createdAt : -1 } )
-			    .skip( skip )
-			    .limit( input.limit )
-			    .toArray(),
-			this.reviews.countDocuments( filter, {
-				session : options?.session,
-			} ),
-		] );
-
-		return {
-			reviews,
-			total,
+	async findManyByUserId(
+	    input: FindUserReviewsInput,
+	    options?: RepositoryOptions,
+	    ): Promise< FindReviewsResult >
+	{
+		const filter: Filter< ReviewDocument > = {
+			userId : input.userId,
+			status : ReviewStatus.Active,
 		};
+
+		return this.findMany( filter, input.page, input.limit, options );
 	}
 
 	async updateById(
@@ -272,6 +274,35 @@ export interface ReviewStats {
 		return {
 			averageRating : Math.round( stats.averageRating * 10 ) / 10,
 			reviewCount : stats.reviewCount,
+		};
+	}
+
+	private async findMany(
+	    filter: Filter< ReviewDocument >,
+	    page: number,
+	    limit: number,
+	    options?: RepositoryOptions,
+	    ): Promise< FindReviewsResult >
+	{
+		const skip = ( page - 1 ) * limit;
+
+		const [ reviews, total ] = await Promise.all( [
+			this.reviews
+			    .find( filter, {
+				    session : options?.session,
+			    } )
+			    .sort( { createdAt : -1 } )
+			    .skip( skip )
+			    .limit( limit )
+			    .toArray(),
+			this.reviews.countDocuments( filter, {
+				session : options?.session,
+			} ),
+		] );
+
+		return {
+			reviews,
+			total,
 		};
 	}
 }

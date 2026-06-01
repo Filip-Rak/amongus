@@ -7,6 +7,8 @@ export interface ReviewDocument {
 	userId: ObjectId;
 	orderId: ObjectId;
 
+	productName: string;
+
 	rating: number;
 	title?: string;
 	comment?: string;

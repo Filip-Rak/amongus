@@ -4,6 +4,8 @@ Review endpoints allow users to read product reviews and allow authenticated reg
 
 A user can review only a product they bought and paid for. Reviews are soft-deleted rather than hard-deleted. Product rating statistics are recalculated after review creation, update, or deletion.
 
+Reviews store a small product snapshot field, \texttt{productName}, when they are created. This allows user review listing views to display the reviewed product name without reading the products collection.
+
 \subsection{Review Response Shape}
 
 Review endpoints return the following review shape:
@@ -14,6 +16,7 @@ Review endpoints return the following review shape:
     "productId": "665000000000000000000010",
     "userId": "665000000000000000000001",
     "orderId": "665000000000000000000030",
+    "productName": "Smart Toaster 3000",
     "rating": 5,
     "title": "Great toaster",
     "comment": "The QR code burn pattern is surprisingly accurate.",
@@ -31,6 +34,26 @@ Soft-deleted reviews may also contain:
 \end{minted}
 
 Public review listing and user review modification endpoints operate on active reviews.
+
+\subsection{Review Product Snapshot}
+
+Each review stores the product name at the time the review is created.
+
+\begin{minted}[frame=single]{json}
+{
+    "productId": "665000000000000000000010",
+    "productName": "Smart Toaster 3000"
+}
+\end{minted}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item \texttt{productId} points to the reviewed product.
+    \item \texttt{productName} is copied from the product during review creation.
+    \item Later product name changes do not rewrite historical review data.
+    \item \texttt{GET /reviews/my} can display product names without reading the products collection.
+\end{itemize}
 
 \subsection{Review Status Values}
 
@@ -68,6 +91,7 @@ The response shape does not expose the status field directly. Deleted reviews ar
     \item The product must exist and be active.
     \item Only active reviews are returned.
     \item Reviews are sorted from newest to oldest.
+    \item Review items include \texttt{productName} as a product name snapshot.
 \end{itemize}
 
 \textbf{Example request:}
@@ -76,6 +100,68 @@ The response shape does not expose the status field directly. Deleted reviews ar
 GET /products/665000000000000000000010/reviews?page=1&limit=20
 \end{minted}
 
+\pagebreak
+\textbf{Example success response:}
+
+\begin{minted}[frame=single]{json}
+{
+    "items": [
+        {
+            "id": "665000000000000000000050",
+            "productId": "665000000000000000000010",
+            "userId": "665000000000000000000001",
+            "orderId": "665000000000000000000030",
+            "productName": "Smart Toaster 3000",
+            "rating": 5,
+            "title": "Great toaster",
+            "comment": "The QR code burn pattern is surprisingly accurate.",
+            "createdAt": "2026-05-30T10:00:00.000Z",
+            "updatedAt": "2026-05-30T10:00:00.000Z"
+        }
+    ],
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+}
+\end{minted}
+
+\subsection{\texttt{GET /reviews/my}}
+
+\textbf{Access:} Authenticated regular user
+
+\textbf{Description:} Returns a paginated list of active reviews created by the currently authenticated user.
+
+\textbf{Headers:}
+
+\begin{minted}[frame=single]{http}
+Authorization: Bearer <accessToken>
+\end{minted}
+
+\textbf{Query parameters:}
+
+\begin{itemize}
+    \item \texttt{page} --- optional positive integer, default: \texttt{1}.
+    \item \texttt{limit} --- optional positive integer, default: \texttt{20}, maximum: \texttt{100}.
+\end{itemize}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item Only users with the \texttt{user} role can use this endpoint.
+    \item The endpoint returns only reviews owned by the authenticated user.
+    \item Only active reviews are returned.
+    \item Reviews are sorted from newest to oldest.
+    \item The response includes \texttt{productName}, which was saved when the review was created.
+    \item The endpoint can serve a simple user reviews view without reading product documents.
+\end{itemize}
+
+\textbf{Example request:}
+
+\begin{minted}[frame=single]{http}
+GET /reviews/my?page=1&limit=20
+Authorization: Bearer <accessToken>
+\end{minted}
 
 \textbf{Example success response:}
 
@@ -87,6 +173,7 @@ GET /products/665000000000000000000010/reviews?page=1&limit=20
             "productId": "665000000000000000000010",
             "userId": "665000000000000000000001",
             "orderId": "665000000000000000000030",
+            "productName": "Smart Toaster 3000",
             "rating": 5,
             "title": "Great toaster",
             "comment": "The QR code burn pattern is surprisingly accurate.",
@@ -143,6 +230,7 @@ Content-Type: application/json
 \begin{itemize}
     \item Only users with the \texttt{user} role can create reviews.
     \item The product must exist and be active.
+    \item The product name is saved into the review as \texttt{productName}.
     \item The user must have a paid, shipped, or completed order containing the reviewed product.
     \item A user can have only one active review per product.
     \item If a previous review was deleted, creating a new active review for the same product is allowed.
@@ -174,6 +262,7 @@ Content-Type: application/json
     "productId": "665000000000000000000010",
     "userId": "665000000000000000000001",
     "orderId": "665000000000000000000030",
+    "productName": "Smart Toaster 3000",
     "rating": 5,
     "title": "Great toaster",
     "comment": "The QR code burn pattern is surprisingly accurate.",
@@ -221,6 +310,7 @@ Authorization: Bearer <accessToken>
 Content-Type: application/json
 \end{minted}
 
+\pagebreak
 \textbf{Request body:}
 
 \begin{minted}[frame=single]{json}
@@ -245,6 +335,7 @@ Content-Type: application/json
     \item At least one editable field must be provided.
     \item Only the owner of the review can update it.
     \item Only active reviews can be updated.
+    \item \texttt{productName} is not editable through this endpoint.
     \item After review update, product \texttt{averageRating} and \texttt{reviewCount} are recalculated.
 \end{itemize}
 
@@ -271,6 +362,7 @@ Content-Type: application/json
     "productId": "665000000000000000000010",
     "userId": "665000000000000000000001",
     "orderId": "665000000000000000000030",
+    "productName": "Smart Toaster 3000",
     "rating": 4,
     "title": "Great toaster",
     "comment": "Updated review comment.",

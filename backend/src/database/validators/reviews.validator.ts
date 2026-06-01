@@ -1,8 +1,10 @@
 import {
+	PRODUCT_NAME_MAX_LENGTH,
 	RATING_MAX,
 	RATING_MIN,
 	REVIEW_COMMENT_MAX_LENGTH,
 	REVIEW_TITLE_MAX_LENGTH,
+	TEXT_MIN_LENGTH,
 } from '@/common/validation/validation-limits';
 
 import {CollectionValidatorDefinition} from './collection-validator-definition';
@@ -16,6 +18,7 @@ export const reviewValidator: CollectionValidatorDefinition = {
 				'productId',
 				'userId',
 				'orderId',
+				'productName',
 				'rating',
 				'status',
 				'createdAt',
@@ -33,6 +36,12 @@ export const reviewValidator: CollectionValidatorDefinition = {
 				orderId : {
 					bsonType : 'objectId',
 					description : 'orderId must be an ObjectId and is required',
+				},
+				productName : {
+					bsonType : 'string',
+					minLength : TEXT_MIN_LENGTH,
+					maxLength : PRODUCT_NAME_MAX_LENGTH,
+					description : 'productName must be a non-empty product name snapshot',
 				},
 				rating : {
 					bsonType : 'number',

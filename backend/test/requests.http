@@ -720,6 +720,14 @@ POST {{baseUrl}}/payments/{{paymentId}}/mock-failure
 GET {{baseUrl}}/products/{{reviewProductId}}/reviews
 
 ###
+# Get all my reviews
+# User
+# Params:
+# - ?page=1&limit=20
+GET {{baseUrl}}/reviews/my
+{{auth}}
+
+###
 # Create review
 # User
 # Body fields:

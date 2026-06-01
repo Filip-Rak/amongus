@@ -60,6 +60,29 @@ import {ReviewRecord} from './types/review-document.type';
 		};
 	}
 
+	async findMine(
+	    userId: ObjectId,
+	    query: ListReviewsQueryDto,
+	    ): Promise< PaginatedReviewsResponseDto >
+	{
+		const page  = query.page ?? 1;
+		const limit = query.limit ?? 20;
+
+		const result = await this.reviewsRepository.findManyByUserId( {
+			userId,
+			page,
+			limit,
+		} );
+
+		return {
+			items : result.reviews.map( ( review ) => this.toResponseDto( review ) ),
+			page,
+			limit,
+			total : result.total,
+			totalPages : Math.ceil( result.total / limit ),
+		};
+	}
+
 	async create(
 	    userId: ObjectId,
 	    productId: ObjectId,
@@ -97,6 +120,7 @@ import {ReviewRecord} from './types/review-document.type';
 				        productId,
 				        userId,
 				        orderId : order._id,
+				        productName : product.name,
 				        rating : dto.rating,
 				        title : dto.title,
 				        comment : dto.comment,
@@ -291,18 +315,23 @@ import {ReviewRecord} from './types/review-document.type';
 
 	private toResponseDto( review: ReviewRecord ): ReviewResponseDto
 	{
-		const { _id, productId, userId, orderId, createdAt, updatedAt, deletedAt, ...reviewData } = review;
-
 		return {
-			id : _id.toHexString(),
-			productId : productId.toHexString(),
-			userId : userId.toHexString(),
-			orderId : orderId.toHexString(),
-			...reviewData,
-			createdAt : createdAt.toISOString(),
-			updatedAt : updatedAt.toISOString(),
-			...( deletedAt && {
-				deletedAt : deletedAt.toISOString(),
+			id : review._id.toHexString(),
+			productId : review.productId.toHexString(),
+			userId : review.userId.toHexString(),
+			orderId : review.orderId.toHexString(),
+			productName : review.productName,
+			rating : review.rating,
+			...( review.title && {
+				title : review.title,
+			} ),
+			...( review.comment && {
+				comment : review.comment,
+			} ),
+			createdAt : review.createdAt.toISOString(),
+			updatedAt : review.updatedAt.toISOString(),
+			...( review.deletedAt && {
+				deletedAt : review.deletedAt.toISOString(),
 			} ),
 		};
 	}

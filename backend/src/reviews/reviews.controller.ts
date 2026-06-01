@@ -27,6 +27,16 @@ import {ReviewsService} from './reviews.service';
 		return this.reviewsService.findByProduct( productId, query );
 	}
 
+	@Get( 'reviews/my' )
+	@Roles( UserRole.User )
+	findMine(
+	    @CurrentUser() user: JwtUser,
+	    @Query() query: ListReviewsQueryDto,
+	    ): Promise< PaginatedReviewsResponseDto >
+	{
+		return this.reviewsService.findMine( new ObjectId( user.sub ), query );
+	}
+
 	@Post( 'products/:productId/reviews' )
 	@Roles( UserRole.User )
 	create(
