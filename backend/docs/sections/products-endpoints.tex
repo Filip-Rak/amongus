@@ -6,9 +6,49 @@ Public product endpoints return only active products. Administrator endpoints ca
 
 Products belong to categories. Product-specific attributes are stored as \texttt{attributeValues}, but the allowed attribute keys and constraints are defined by the selected category and its ancestors.
 
+The public product list endpoint is optimized for frontend product card views. It returns only the data needed for a listing view: product name, slug, description, price, and primary image. Full product data is still available through product detail endpoints and administrator endpoints.
+
+\subsection{Product List Item Response Shape}
+
+The public product listing endpoint returns compact product items.
+
+\begin{minted}[frame=single]{json}
+{
+    "id": "665000000000000000000010",
+    "name": "Smart Toaster 3000",
+    "slug": "smart-toaster-3000",
+    "description": "A toaster with advanced burn pattern support.",
+    "price": {
+        "amount": 24999,
+        "currency": "PLN"
+    },
+    "image": {
+        "url": "https://example.com/toaster.jpg",
+        "alt": "Smart Toaster 3000"
+    }
+}
+\end{minted}
+
+If the product has no image, the \texttt{image} field is \texttt{null}.
+
+\begin{minted}[frame=single]{json}
+{
+    "image": null
+}
+\end{minted}
+
+\textbf{Important rules:}
+
+\begin{itemize}
+    \item This compact shape is used by \texttt{GET /products}.
+    \item The endpoint is intended for product listing and product card views.
+    \item It does not include stock, category, attributes, status, rating statistics, or timestamps.
+    \item Full product data should be requested from \texttt{GET /products/:id} or \texttt{GET /products/slug/:slug}.
+\end{itemize}
+
 \subsection{Product Response Shape}
 
-Most product endpoints return the following product shape:
+Product detail and administrator endpoints return the full product shape:
 
 \begin{minted}[frame=single]{json}
 {
@@ -95,6 +135,8 @@ This represents \texttt{249.99 PLN}.
 \begin{itemize}
     \item A product can have at most one primary image.
     \item If images are provided but none is marked as primary, the backend marks the first image as primary.
+    \item Public product listing returns only the primary image as a compact \texttt{image} object.
+    \item Full product detail endpoints return the full \texttt{images} array.
 \end{itemize}
 
 \pagebreak
@@ -138,7 +180,7 @@ This returns the inherited attribute definitions needed to build the product for
 
 \textbf{Access:} Public
 
-\textbf{Description:} Returns a paginated list of active products.
+\textbf{Description:} Returns a paginated compact list of active products for product listing and product card views.
 
 \textbf{Query parameters:}
 
@@ -158,9 +200,13 @@ This returns the inherited attribute definitions needed to build the product for
 
 \begin{itemize}
     \item Public listing returns active products only.
+    \item The response uses a compact product list item shape.
+    \item The response includes only product card data: \texttt{id}, \texttt{name}, \texttt{slug}, \texttt{description}, \texttt{price}, and \texttt{image}.
+    \item Stock, category, attributes, status, ratings, and timestamps are intentionally omitted from this endpoint.
     \item \texttt{minPrice} cannot be greater than \texttt{maxPrice}.
     \item If \texttt{categoryId} is provided, the category must exist and be active.
     \item If \texttt{includeSubcategories=true}, products from descendant categories are included.
+    \item Full product data should be requested from \texttt{GET /products/:id} or \texttt{GET /products/slug/:slug}.
 \end{itemize}
 
 \textbf{Example request:}
@@ -196,19 +242,10 @@ GET /products?search=toaster&minPrice=10000&maxPrice=30000&inStockOnly=true
                 "amount": 24999,
                 "currency": "PLN"
             },
-            "stock": 10,
-            "categoryId": "665000000000000000000002",
-            "images": [],
-            "attributeValues": {
-                "brand": "Samsung",
-                "burn_pattern": "qr_code",
-                "slices": 4
-            },
-            "status": "active",
-            "averageRating": 0,
-            "reviewCount": 0,
-            "createdAt": "2026-05-30T10:00:00.000Z",
-            "updatedAt": "2026-05-30T10:00:00.000Z"
+            "image": {
+                "url": "https://example.com/toaster.jpg",
+                "alt": "Smart Toaster 3000"
+            }
         }
     ],
     "page": 1,
@@ -222,7 +259,7 @@ GET /products?search=toaster&minPrice=10000&maxPrice=30000&inStockOnly=true
 
 \textbf{Access:} Public
 
-\textbf{Description:} Returns one active product by identifier.
+\textbf{Description:} Returns one active product by identifier. This endpoint returns the full public product details.
 
 \textbf{Path parameters:}
 
@@ -269,7 +306,7 @@ GET /products/665000000000000000000010
 
 \textbf{Access:} Public
 
-\textbf{Description:} Returns one active product by slug.
+\textbf{Description:} Returns one active product by slug. This endpoint returns the full public product details.
 
 \textbf{Path parameters:}
 
@@ -287,7 +324,7 @@ GET /products/slug/smart-toaster-3000
 
 \textbf{Access:} Administrator
 
-\textbf{Description:} Returns a paginated product list for administrators. Unlike the public listing, this endpoint can include draft and archived products.
+\textbf{Description:} Returns a paginated product list for administrators. Unlike the public listing, this endpoint can include draft and archived products and returns full product data.
 
 \textbf{Headers:}
 

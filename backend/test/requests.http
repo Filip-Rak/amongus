@@ -394,7 +394,7 @@ DELETE {{baseUrl}}/categories/{{categoryId}}
 
 @productId = 6a1aae30be4f8dfeda905893
 @productSlug = mechanical-keyboard-k87
-@productCategoryId = 6a1aadabbe4f8dfeda905892
+@productCategoryId = 6a1acb94a3073b4327610e16
 
 ###
 # Get public products

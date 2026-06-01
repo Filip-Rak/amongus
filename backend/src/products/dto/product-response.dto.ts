@@ -1,6 +1,28 @@
 import {ProductAttributeValue, ProductImage, ProductPrice} from '@/products/types/product-document.type';
 import {ProductStatus} from '@/products/types/product-status.enum';
 
+export interface ProductListImageResponseDto {
+	url: string;
+	alt?: string;
+}
+
+export interface ProductListItemResponseDto {
+	id: string;
+	name: string;
+	slug: string;
+	description: string;
+	price: ProductPrice;
+	image: ProductListImageResponseDto|null;
+}
+
+export interface PaginatedProductListResponseDto {
+	items: ProductListItemResponseDto[];
+	page: number;
+	limit: number;
+	total: number;
+	totalPages: number;
+}
+
 export interface ProductResponseDto {
 	id: string;
 	name: string;

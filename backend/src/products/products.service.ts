@@ -10,10 +10,15 @@ import {ObjectId} from 'mongodb';
 
 import {CreateProductDto} from './dto/create-product.dto';
 import {ListProductsQueryDto} from './dto/list-products-query.dto';
-import {PaginatedProductsResponseDto, ProductResponseDto} from './dto/product-response.dto';
+import {
+	PaginatedProductListResponseDto,
+	PaginatedProductsResponseDto,
+	ProductListItemResponseDto,
+	ProductResponseDto
+} from './dto/product-response.dto';
 import {UpdateProductDto} from './dto/update-product.dto';
 import {CreateProductInput, ProductsRepository, UpdateProductInput} from './products.repository';
-import {ProductAttributeValue, ProductImage, ProductRecord} from './types/product-document.type';
+import {ProductAttributeValue, ProductImage, ProductPrice, ProductRecord} from './types/product-document.type';
 import {ProductStatus} from './types/product-status.enum';
 
 @Injectable() export class ProductsService
@@ -43,9 +48,37 @@ import {ProductStatus} from './types/product-status.enum';
 
 	async findPublic(
 	    query: ListProductsQueryDto,
-	    ): Promise< PaginatedProductsResponseDto >
+	    ): Promise< PaginatedProductListResponseDto >
 	{
-		return this.findMany( query, false );
+		this.assertValidPriceRange( query );
+
+		const page  = query.page ?? 1;
+		const limit = query.limit ?? 20;
+
+		const categoryIds = await this.resolveCategoryIdsForListing(
+		    query.categoryId,
+		    query.includeSubcategories,
+		);
+
+		const result = await this.productsRepository.findManyForPublicList( {
+			page,
+			limit,
+			search : query.search,
+			status : ProductStatus.Active,
+			categoryIds,
+			minPrice : query.minPrice,
+			maxPrice : query.maxPrice,
+			inStockOnly : query.inStockOnly,
+			includeInactive : false,
+		} );
+
+		return {
+			items : result.products.map( ( product ) => this.toListItemResponseDto( product ) ),
+			page,
+			limit,
+			total : result.total,
+			totalPages : Math.ceil( result.total / limit ),
+		};
 	}
 
 	async findAdmin(
@@ -520,6 +553,31 @@ import {ProductStatus} from './types/product-status.enum';
 
 		default: throw new BadRequestException( `Unsupported attribute type for "${key}"` );
 		}
+	}
+
+	private toListItemResponseDto(
+	    product: {
+		    _id: ObjectId; name : string; slug : string; description : string; price : ProductPrice;
+		    images?: ProductImage[];
+	    },
+	    ): ProductListItemResponseDto
+	{
+		const primaryImage = product.images?.[ 0 ];
+
+		return {
+			id : product._id.toHexString(),
+			name : product.name,
+			slug : product.slug,
+			description : product.description,
+			price : product.price,
+			image : primaryImage ? {
+				url : primaryImage.url,
+				...( primaryImage.alt && {
+					alt : primaryImage.alt,
+				} ),
+			}
+			                     : null,
+		};
 	}
 
 	private assertValidAttributeValuesObject(

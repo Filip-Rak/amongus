@@ -7,7 +7,11 @@ import {ObjectId} from 'mongodb';
 
 import {CreateProductDto} from './dto/create-product.dto';
 import {ListProductsQueryDto} from './dto/list-products-query.dto';
-import {PaginatedProductsResponseDto, ProductResponseDto} from './dto/product-response.dto';
+import {
+	PaginatedProductListResponseDto,
+	PaginatedProductsResponseDto,
+	ProductResponseDto
+} from './dto/product-response.dto';
 import {UpdateProductDto} from './dto/update-product.dto';
 import {ProductsService} from './products.service';
 
@@ -19,7 +23,7 @@ import {ProductsService} from './products.service';
 	@Get()
 	findPublic(
 	    @Query() query: ListProductsQueryDto,
-	    ): Promise< PaginatedProductsResponseDto >
+	    ): Promise< PaginatedProductListResponseDto >
 	{
 		return this.productsService.findPublic( query );
 	}

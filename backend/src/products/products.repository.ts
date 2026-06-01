@@ -13,6 +13,20 @@ import {
 } from './types/product-document.type';
 import {ProductStatus} from './types/product-status.enum';
 
+export interface ProductListItemRecord {
+	_id: ObjectId;
+	name: string;
+	slug: string;
+	description: string;
+	price: ProductPrice;
+	images?: ProductImage[];
+}
+
+export interface FindProductListItemsResult {
+	products: ProductListItemRecord[];
+	total: number;
+}
+
 export interface CreateProductInput {
 	name: string;
 	slug: string;
@@ -152,6 +166,45 @@ type ProductFindFilter = Filter< ProductDocument >&
 		return {
 			_id : result.insertedId,
 			...document,
+		};
+	}
+
+	async findManyForPublicList(
+	    input: FindProductsInput,
+	    ): Promise< FindProductListItemsResult >
+	{
+		const filter = this.buildFindManyFilter( input );
+
+		const skip = ( input.page - 1 ) * input.limit;
+
+		const [ products, total ] = await Promise.all( [
+			this.products
+			    .find< ProductListItemRecord >(
+			        filter,
+			        {
+				        projection : {
+					        name : 1,
+					        slug : 1,
+					        description : 1,
+					        price : 1,
+					        images : {
+						        $elemMatch : {
+							        isPrimary : true,
+						        },
+					        },
+				        },
+			        },
+			        )
+			    .sort( { createdAt : -1 } )
+			    .skip( skip )
+			    .limit( input.limit )
+			    .toArray(),
+			this.products.countDocuments( filter ),
+		] );
+
+		return {
+			products,
+			total,
 		};
 	}
 
