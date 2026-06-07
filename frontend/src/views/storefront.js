@@ -123,14 +123,15 @@ function renderProductsGrid() {
 
     grid.innerHTML = productsData.map(product => {
         const formattedPrice = product.price ? `${(product.price.amount / 100).toFixed(2)} ${product.price.currency}` : 'N/A';
-        const primaryImg = product.images && product.images.find(img => img.isPrimary);
+
+        // Adapt to the optimized product shape 7.1 (single image object instead of images array)
+        const primaryImg = product.image;
 
         const imageHtml = primaryImg && primaryImg.url
             ? `<img src="${primaryImg.url}" alt="${primaryImg.alt || product.name}" class="product-title-link" data-id="${product.id}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 4px; margin-bottom: 15px; cursor: pointer;">`
             : `<div class="product-title-link" data-id="${product.id}" style="width: 100%; height: 200px; background-color: #e9ecef; border-radius: 4px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; color: #6c757d; cursor: pointer;">No Image Available</div>`;
 
-        const isOutOfStock = product.stock <= 0;
-
+        // Stock tracking attributes are omitted in compact DTO mode 7.1, purchase button remains active
         return `
             <div style="border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; background-color: #fff; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <div>
@@ -141,13 +142,10 @@ function renderProductsGrid() {
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <span style="font-size: 18px; font-weight: bold; color: #28a745;">${formattedPrice}</span>
-                        <span style="font-size: 12px; color: ${isOutOfStock ? 'red' : '#6c757d'};">
-                            ${isOutOfStock ? 'Out of stock' : `Stock: ${product.stock}`}
-                        </span>
                     </div>
-                    <button class="add-to-cart-btn" data-id="${product.id}" ${isOutOfStock ? 'disabled' : ''} 
-                        style="width: 100%; padding: 10px; background-color: ${isOutOfStock ? '#6c757d' : '#007bff'}; color: white; border: none; border-radius: 4px; cursor: ${isOutOfStock ? 'not-allowed' : 'pointer'}; font-weight: bold;">
-                        ${isOutOfStock ? 'Unavailable' : 'Add to Cart'}
+                    <button class="add-to-cart-btn" data-id="${product.id}" 
+                        style="width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        Add to Cart
                     </button>
                 </div>
             </div>
