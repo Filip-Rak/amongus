@@ -9,7 +9,6 @@ import {ReviewStatus} from './types/review-status.enum';
 export interface CreateReviewInput {
 	productId: ObjectId;
 	userId: ObjectId;
-	orderId: ObjectId;
 	productName: string;
 	rating: number;
 	title?: string;
@@ -94,15 +93,6 @@ export interface ReviewStats {
 			    name : 'ix_reviews_user_id_created_at',
 		    },
 		);
-
-		await this.reviews.createIndex(
-		    {
-			    orderId : 1,
-		    },
-		    {
-			    name : 'ix_reviews_order_id',
-		    },
-		);
 	}
 
 	async create(
@@ -115,7 +105,6 @@ export interface ReviewStats {
 		const document: ReviewDocument = {
 			productId : input.productId,
 			userId : input.userId,
-			orderId : input.orderId,
 			productName : input.productName,
 			rating : input.rating,
 			title : input.title,

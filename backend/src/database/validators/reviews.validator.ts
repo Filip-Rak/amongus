@@ -17,7 +17,6 @@ export const reviewValidator: CollectionValidatorDefinition = {
 			required : [
 				'productId',
 				'userId',
-				'orderId',
 				'productName',
 				'rating',
 				'status',
@@ -32,10 +31,6 @@ export const reviewValidator: CollectionValidatorDefinition = {
 				userId : {
 					bsonType : 'objectId',
 					description : 'userId must be an ObjectId and is required',
-				},
-				orderId : {
-					bsonType : 'objectId',
-					description : 'orderId must be an ObjectId and is required',
 				},
 				productName : {
 					bsonType : 'string',

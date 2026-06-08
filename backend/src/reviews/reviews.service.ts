@@ -119,7 +119,6 @@ import {ReviewRecord} from './types/review-document.type';
 			        {
 				        productId,
 				        userId,
-				        orderId : order._id,
 				        productName : product.name,
 				        rating : dto.rating,
 				        title : dto.title,
@@ -319,7 +318,6 @@ import {ReviewRecord} from './types/review-document.type';
 			id : review._id.toHexString(),
 			productId : review.productId.toHexString(),
 			userId : review.userId.toHexString(),
-			orderId : review.orderId.toHexString(),
 			productName : review.productName,
 			rating : review.rating,
 			...( review.title && {

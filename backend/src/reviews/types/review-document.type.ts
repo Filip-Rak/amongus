@@ -5,7 +5,6 @@ import {ReviewStatus} from './review-status.enum';
 export interface ReviewDocument {
 	productId: ObjectId;
 	userId: ObjectId;
-	orderId: ObjectId;
 
 	productName: string;
 

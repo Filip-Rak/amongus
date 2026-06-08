@@ -2,7 +2,6 @@ export interface ReviewResponseDto {
 	id: string;
 	productId: string;
 	userId: string;
-	orderId: string;
 
 	productName: string;
 
